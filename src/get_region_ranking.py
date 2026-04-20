@@ -57,11 +57,11 @@ def rank_regions_by_similarity(df, target_region, compare_only_introduced=False)
         
         results.append({
             'Region': region,
-            'Shared Species': intersection,
-            'Total Unique Species in Both': union,
-            'Target Region Total': len(target_species),
-            'Comparison Region Total': len(species_set),
-            'Similarity Score': similarity_score
+            'Shared species': intersection,
+            'Total unique species in both': union,
+            'Target region total': len(target_species),
+            'Comparison region total': len(species_set),
+            'Similarity score': similarity_score
         })
         
     results_df = pd.DataFrame(results)
@@ -69,7 +69,7 @@ def rank_regions_by_similarity(df, target_region, compare_only_introduced=False)
     if results_df.empty:
         return "No other regions available for comparison."
         
-    ranked_results = results_df.sort_values(by='Similarity Score', ascending=False).reset_index(drop=True)
+    ranked_results = results_df.sort_values(by='Similarity score', ascending=False).reset_index(drop=True)
     return ranked_results
 
 # Generate probability risk based on which IAS come from similar countries but have not yet invaded BE
@@ -102,7 +102,7 @@ def predict_ias_risk(df, similarity_df, target_region, species_to_validate, slee
         return "No new invasive species found."
 
     taxon_name_map = new_ias_df.groupby('taxon_clean')['taxon'].first().to_dict()
-    sim_dict = dict(zip(similarity_df['Region'], similarity_df['Similarity Score']))
+    sim_dict = dict(zip(similarity_df['Region'], similarity_df['Similarity score']))
     grouped_ias = new_ias_df.groupby('taxon_clean')['location_clean'].apply(set)
     
     # 3. RANK FIRST (Calculate scores locally)
@@ -114,15 +114,15 @@ def predict_ias_risk(df, similarity_df, target_region, species_to_validate, slee
             risk_records.append({
                 'clean_taxon': clean_species,
                 'Species': taxon_name_map[clean_species],
-                'Cumulative Risk Score': sum(scores),
-                'Max Single-Region Similarity': max(scores),
-                'Found In Regions': ", ".join(sorted(regions)),
-                'Region Count': len(regions)
+                'Cumulative risk score': sum(scores),
+                'Max single-region similarity': max(scores),
+                'Found in regions': ", ".join(sorted(regions)),
+                'Region count': len(regions)
             })
             
     risk_df = pd.DataFrame(risk_records)
     risk_df = risk_df.sort_values(
-        by=['Cumulative Risk Score', 'Max Single-Region Similarity'], 
+        by=['Cumulative risk score', 'Max single-region similarity'], 
         ascending=[False, False]
     ).reset_index(drop=True)
 
