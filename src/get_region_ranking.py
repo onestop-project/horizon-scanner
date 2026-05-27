@@ -4,7 +4,40 @@ import time
 import pandas as pd
 from pygbif import occurrences
 import pycountry
+from geopy.geocoders import Nominatim
+from geopy.extra.rate_limiter import RateLimiter
 from tqdm.auto import tqdm
+from geopy.distance import geodesic
+from pygbif import species as gbif_species
+import wbgapi as wb
+import country_converter as coco
+import requests
+import logging
+
+#get country centroids
+
+def get_region_centroids(regions_list):
+    """
+    Fetches (latitude, longitude) centroids for a list of unique regions.
+    Uses rate limiting to respect OpenStreetMap API guidelines.
+    """
+    geolocator = Nominatim(user_agent="ias_spatial_assessor")
+    geocode = RateLimiter(geolocator.geocode, min_delay_seconds=1.0)
+    
+    centroids = {}
+    print(f"Fetching geographic centroids for {len(regions_list)} unique regions...")
+    
+    for region in tqdm(regions_list, desc="Geocoding Regions"):
+        try:
+            location = geocode(region)
+            if location:
+                centroids[region] = (location.latitude, location.longitude)
+            else:
+                centroids[region] = None
+        except Exception:
+            centroids[region] = None 
+            
+    return centroids
 
 #get country similarity rankings for a target region
 
@@ -76,105 +109,214 @@ def rank_regions_by_similarity(df, target_region, compare_only_introduced=False)
 
 def predict_ias_risk(df, similarity_df, target_region, species_to_validate, sleep_time=0.5):
     """
-    Ranks potential IAS threats locally first, then validates only the highest-risk 
-    species against GBIF using a tqdm progress bar, respecting API rate limits.
+    Ranks potential IAS threats using a Cumulative Hybrid Score.
+    Validates presence via GBIF and includes the Backbone matched name for manual verification.
     """
-    # 1. Clean Data
+    # 1. Setup & Cleaning
     df['location_clean'] = df['location'].dropna().astype(str).str.strip().str.title()
     df['taxon_clean'] = df['taxon'].dropna().astype(str).str.strip().str.lower()
     target_region = target_region.strip().title()
     
-    # Try to resolve country code
     gbif_country_code = None
     try:
         gbif_country_code = pycountry.countries.lookup(target_region).alpha_2
     except LookupError:
         pass
 
-    # 2. Local exclusions (Phase 1)
+    # 2. Local Exclusions (Phase 1)
     target_species_clean = set(df[df['location_clean'] == target_region]['taxon_clean'])
     is_introduced = df['establishmentMeans'].astype(str).str.strip().str.lower() == 'introduced'
     ias_df = df[is_introduced].dropna(subset=['taxon_clean', 'location_clean'])
-    
     new_ias_df = ias_df[~ias_df['taxon_clean'].isin(target_species_clean)]
     
     if new_ias_df.empty:
         return "No new invasive species found."
 
     taxon_name_map = new_ias_df.groupby('taxon_clean')['taxon'].first().to_dict()
-    sim_dict = dict(zip(similarity_df['Region'], similarity_df['Similarity score']))
-    grouped_ias = new_ias_df.groupby('taxon_clean')['location_clean'].apply(set)
     
-    # 3. RANK FIRST (Calculate scores locally)
-    print("Ranking species locally first...")
+    # Identify similarity column (case-insensitive)
+    sim_col = [c for c in similarity_df.columns if 'imilarity' in c]
+    sim_dict = dict(zip(similarity_df['Region'], similarity_df[sim_col]))
+    
+    grouped_ias = new_ias_df.groupby('taxon_clean')['location_clean'].apply(set)
+    extracted_centroids = df.dropna(subset=['location_clean', 'Centroid']).set_index('location_clean')['Centroid'].to_dict()
+    target_coords = extracted_centroids.get(target_region)
+
+    # 3. Hybrid Ranking (Phase 2)
+    print("Ranking species locally...")
     risk_records = []
     for clean_species, regions in grouped_ias.items():
-        scores = [sim_dict.get(region, 0.0) for region in regions]
-        if scores:
-            risk_records.append({
-                'clean_taxon': clean_species,
-                'Species': taxon_name_map[clean_species],
-                'Cumulative risk score': sum(scores),
-                'Max single-region similarity': max(scores),
-                'Found in regions': ", ".join(sorted(regions)),
-                'Region count': len(regions)
-            })
+        hybrid_cumulative_score = 0.0
+        max_sim = 0.0
+        for region in regions:
+            sim = sim_dict.get(region, 0.0)
+            region_coords = extracted_centroids.get(region)
+            if sim > max_sim: max_sim = sim
             
-    risk_df = pd.DataFrame(risk_records)
-    risk_df = risk_df.sort_values(
-        by=['Cumulative risk score', 'Max single-region similarity'], 
+            if target_coords and region_coords:
+                dist_km = geodesic(target_coords, region_coords).kilometers
+                # 1000km half-life decay
+                weight = 1.0 / (1.0 + (dist_km / 1000.0))
+            else:
+                weight = 0.05
+            hybrid_cumulative_score += (sim * weight)
+            
+        risk_records.append({
+            'clean_taxon': clean_species,
+            'Species': taxon_name_map[clean_species],
+            'Hybrid Risk Score': hybrid_cumulative_score, 
+            'Max Single-Region Similarity': max_sim,
+            'Found In Regions': ", ".join(sorted(regions)),
+            'Region Count': len(regions)
+        })
+            
+    risk_df = pd.DataFrame(risk_records).sort_values(
+        by=['Hybrid Risk Score', 'Max Single-Region Similarity'], 
         ascending=[False, False]
     ).reset_index(drop=True)
 
-    # 4. VALIDATE LATER (Check only the top K against GBIF)
+    # 4. GBIF Validation (Phase 3)
     if not gbif_country_code:
-        print("No country code resolved. Returning purely local rankings.")
         return risk_df.drop(columns=['clean_taxon'])
 
     print(f"Validating top threats against GBIF for '{gbif_country_code}'...")
-    
     validated_records = []
     api_calls_made = 0
     errors_hit = 0
     
-    # Initialize tqdm progress bar
     with tqdm(total=species_to_validate, desc="True threats found", unit="species") as pbar:
         for _, row in risk_df.iterrows():
-            # Stop once we've found our target amount of validated threats
             if len(validated_records) >= species_to_validate:
                 break
                 
-            original_sp = row['Species']
-            
-            # THROTTLE: Respect rate limits before making the call
             if api_calls_made > 0:
                 time.sleep(sleep_time)
-                
+            
             api_calls_made += 1
+            current_sp = row['Species']
             
             try:
-                res = occurrences.search(scientificName=original_sp, country=gbif_country_code, limit=1)
+                # Get Backbone Match for the column
+                # species is the module imported from pygbif
+                match = match = gbif_species.name_backbone(name=current_sp)
+                gbif_name = match.get('scientificName', 'No match')
+                match_type = match.get('matchType', 'NONE')
+                
+                # Check for occurrences in target country
+                res = occurrences.search(scientificName=current_sp, country=gbif_country_code, limit=0)
                 
                 if res['count'] == 0:
-                    # Genuinely missing from GBIF! Add it and update the progress bar.
-                    validated_records.append(row)
+                    # Species not found in target country: Add to horizon scan list
+                    new_row = row.to_dict()
+                    new_row['GBIF Matched Name'] = f"{gbif_name} [{match_type}]"
+                    validated_records.append(new_row)
                     pbar.update(1)
                 
-                # Update the side-counter
                 pbar.set_postfix({'API Calls': api_calls_made, 'Errors': errors_hit})
                         
             except Exception as e:
                 errors_hit += 1
-                # Back off dynamically if we hit an error (e.g., HTTP 429 Too Many Requests)
-                time.sleep(sleep_time * 5) 
-                validated_records.append(row) # Keeping it to be safe
+                time.sleep(sleep_time * 5)
+                # On error, we keep it as a potential threat but flag the name
+                err_row = row.to_dict()
+                err_row['GBIF Matched Name'] = "FETCH ERROR"
+                validated_records.append(err_row)
                 pbar.update(1)
-                pbar.set_postfix({'API Calls': api_calls_made, 'Errors': errors_hit})
 
-    print(f"Done! Evaluated {api_calls_made} species via GBIF to isolate {len(validated_records)} validated threats.")
-    
     final_df = pd.DataFrame(validated_records)
     if not final_df.empty:
-        final_df = final_df.drop(columns=['clean_taxon']).reset_index(drop=True)
+        final_df = final_df.drop(columns=['clean_taxon'], errors='ignore').reset_index(drop=True)
         
     return final_df
+
+def get_valid_countries(df, loc_col='location'):
+    """Converts unique locations to ISO3 with a progress bar."""
+    cc = coco.CountryConverter()
+    unique_locs = df[loc_col].unique()
+    
+    iso_map = {}
+    for loc in tqdm(unique_locs, desc="Step 1/4: Validating Locations"):
+        # We do this one by one to keep the tqdm bar moving
+        iso = cc.convert(names=loc, to='ISO3', not_found=None)
+        iso_map[loc] = iso
+    
+    df['iso3'] = df[loc_col].map(iso_map)
+    # Filter out 'not found' or None
+    valid_df = df[(df['iso3'] != 'not found') & (df['iso3'].notna())].copy()
+    return valid_df
+
+def fetch_wdi_data(iso_list):
+    """Fetches World Bank indicators with robust column naming."""
+    indicators = {'NY.TRD.TICR.ZS.GD': 'trade_pct_gdp', 'EN.POP.DNST': 'pop_density'}
+    all_results = []
+    
+    chunk_size = 10
+    chunks = [iso_list[i:i + chunk_size] for i in range(0, len(iso_list), chunk_size)]
+    
+    for chunk in tqdm(chunks, desc="Step 2/4: Fetching Economic Data"):
+        try:
+            # Note: mrv=1 returns a DataFrame with ISO codes as the index
+            data = wb.data.DataFrame(list(indicators.keys()), chunk, mrv=1)
+            if not data.empty:
+                all_results.append(data)
+            time.sleep(1.2)
+        except Exception as e:
+            print(f"Error in WDI chunk {chunk}: {e}")
+            
+    if not all_results:
+        return pd.DataFrame(columns=['economy', 'trade_pct_gdp', 'pop_density'])
+        
+    # Concatenate and force the index to be named 'economy'
+    final_wdi = pd.concat(all_results)
+    final_wdi = final_wdi.rename(columns=indicators)
+    
+    # Use 'names' parameter to ensure the column is called 'economy'
+    final_wdi = final_wdi.reset_index(names='economy') 
+    
+    return final_wdi
+
+def fetch_cckp_climate(iso, var='tas'):
+    """Internal helper for CCKP."""
+    url = f"https://climateknowledgeportal.worldbank.org/api/data/get-aggregated-data/cru-x0.5/{var}/climatology/annual/{iso}"
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            return data['data']['value'] if data else None
+    except: return None
+
+def enrich_climate_and_gbif(df):
+    """Fetches Climate and GBIF data with a combined progress bar."""
+    unique_isos = df['iso3'].unique().tolist()
+    temp_cache, precip_cache, ias_cache = {}, {}, {}
+
+    for iso in tqdm(unique_isos, desc="Step 3/4: Fetching Climate & GBIF"):
+        # CCKP Climate (Temp & Precip)
+        temp_cache[iso] = fetch_cckp_climate(iso, 'tas')
+        time.sleep(0.4) # Small sleep between different API endpoints
+        precip_cache[iso] = fetch_cckp_climate(iso, 'pr')
+        
+        # GBIF Invasion Counts
+        try:
+            time.sleep(0.5)
+            ias_cache[iso] = gbif_species.name_count(is_invasive=True, country=iso[:2])
+        except:
+            ias_cache[iso] = 0
+            
+    df['annual_mean_temp'] = df['iso3'].map(temp_cache)
+    df['annual_precip'] = df['iso3'].map(precip_cache)
+    df['invasion_debt_count'] = df['iso3'].map(ias_cache)
+    return df
+
+def full_enrichment_pipeline(df, worldclim_config=None):
+    """The master function calling everything with bars."""
+    # 1. Locations
+    df = get_valid_countries(df)
+    
+    # 2. World Bank WDI
+    unique_isos = df['iso3'].unique().tolist()
+    wdi_df = fetch_wdi_data(unique_isos)
+    df = df.merge(wdi_df, left_on='iso3', right_on='economy', how='left')
+    
+    # 3. Climate & GBIF
+    df = enrich_climate_and_gbif(df)
