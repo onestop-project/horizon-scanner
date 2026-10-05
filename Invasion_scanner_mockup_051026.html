@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Invasion horizon scanner</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f7f9;--ink:#1c2430;--mute:#697386;--line:#dfe3ea;--panel:#fff;--acc:#2f5d8a;--pos:#c8553d;--neg:#2f6fb0;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14181f;--ink:#e8ecf2;--mute:#8d97a8;--line:#2a313c;--panel:#1b212a;--acc:#6fa3d6;--pos:#ef7f66;--neg:#6fa3d6}}
+:root[data-theme="dark"]{--bg:#14181f;--ink:#e8ecf2;--mute:#8d97a8;--line:#2a313c;--panel:#1b212a;--acc:#6fa3d6;--pos:#ef7f66;--neg:#6fa3d6}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 "Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1100px;margin:0 auto;padding:32px 20px 56px}
+h1{font-size:26px;font-weight:600;letter-spacing:-.01em;margin:0 0 2px}
+h2{font-size:17px;font-weight:600;margin:28px 0 8px}
+.sub,.muted{color:var(--mute)}
+.sim{display:inline-block;font-size:13px;border:1px solid var(--line);border-radius:6px;padding:2px 10px;margin:8px 0 0;color:var(--mute)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:20px 0 24px}
+.tabs button{border:0;background:none;color:var(--mute);font:inherit;font-weight:500;padding:8px 16px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-color:var(--acc)}
+button:focus-visible,input:focus-visible,select:focus-visible,tr:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:20px}
+.form{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end}
+label{display:block;font-size:13px;color:var(--mute);margin-bottom:4px}
+select,input[type=number]{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:180px}
+input[type=number]{min-width:110px;width:110px}
+.lenbox{display:flex;gap:12px;align-items:center}
+input[type=range]{accent-color:var(--acc);width:200px}
+.go{font:inherit;font-weight:500;background:var(--acc);color:#fff;border:0;border-radius:8px;padding:9px 20px;cursor:pointer}
+:root[data-theme="dark"] .go{color:#10151c}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .go{color:#10151c}}
+.go:disabled{opacity:.6;cursor:wait}
+.stats{display:flex;flex-wrap:wrap;gap:28px;margin-bottom:16px}
+.stats b{display:block;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.stats span{font-size:13px;color:var(--mute)}
+.filters{display:grid;gap:14px}
+.row{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+.row>label{margin:0;min-width:130px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:none;color:var(--ink);font:inherit;font-size:13px;padding:3px 11px;border-radius:999px;cursor:pointer}
+.chip[aria-pressed="false"]{color:var(--mute);opacity:.55;text-decoration:line-through}
+.sl{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--mute)}
+.sl output{min-width:48px;color:var(--ink);font-variant-numeric:tabular-nums}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px}
+.charts h3{font-size:14px;font-weight:600;margin:0 0 6px}
+canvas{width:100%;height:280px;display:block}
+.charts>div{position:relative;min-width:0}
+.tip{position:absolute;z-index:2;background:var(--ink);color:var(--bg);border-radius:8px;padding:8px 12px;font-size:13px;line-height:1.5;max-width:230px;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+.tip i{font-weight:600}.tip svg{vertical-align:-2px;margin-right:4px}
+.tip button{margin-top:4px;padding:0;border:0;background:none;color:inherit;font:inherit;text-decoration:underline;cursor:pointer}
+.tbar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:10px}.tbar .more,.dx .more{margin:0}.xm{font-size:13px;color:var(--mute)}
+.ed{display:flex;gap:12px;align-items:flex-start;margin:8px 0;font-size:14px}.ed .eb{flex:none;min-width:38px;margin-top:2px}
+.ec summary{cursor:pointer;font-size:13px;color:var(--mute)}.ec[open] summary{color:var(--ink)}
+.sb{border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;white-space:nowrap}
+.sb:hover,th[aria-sort] .sb{color:var(--ink)}
+.sb span{display:inline-block;width:14px;font-size:10px;opacity:.9}
+.cnote{font-size:12px;color:var(--mute);margin:4px 0 0}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:620px}
+th{text-align:left;font-weight:500;color:var(--mute);font-size:13px;padding:6px 10px;border-bottom:1px solid var(--line)}
+td{padding:8px 10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;vertical-align:middle}
+tbody tr{cursor:pointer}tbody tr:hover{background:color-mix(in srgb,var(--acc) 8%,transparent)}
+td svg{vertical-align:-2px;margin-right:4px}
+.rb{display:inline-block;width:70px;height:6px;background:var(--line);border-radius:3px;margin-right:8px;vertical-align:middle;overflow:hidden}
+.rb span{display:block;height:100%;background:var(--acc)}
+.eb{display:inline-block;min-width:34px;text-align:center;font-size:12px;font-weight:600;border-radius:5px;padding:1px 7px}
+.e-MC{background:#a9d4b0;color:#14301b}.e-MN{background:#ead877;color:#3a3100}.e-MO{background:#f2a954;color:#3d2300}.e-MR{background:#e26a3f;color:#fff}.e-MV{background:#a6242a;color:#fff}
+.e-DD,.e-NE{border:1px solid var(--line);color:var(--mute)}
+.more{margin-top:12px;font:inherit;background:none;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 16px;cursor:pointer}
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--panel);border-left:1px solid var(--line);padding:calc(20px + env(safe-area-inset-top,0px)) 20px calc(20px + env(safe-area-inset-bottom,0px));overflow-y:auto;transform:translateX(105%);transition:transform .2s;z-index:10;box-shadow:-8px 0 24px rgba(0,0,0,.12)}
+#drawer.open{transform:none}
+#drawer h3{margin:0;font-size:18px;font-style:italic;font-weight:600}
+.x{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:14px;border:0;background:none;color:var(--mute);font-size:24px;cursor:pointer}
+.meta{display:flex;flex-wrap:wrap;gap:6px 16px;margin:8px 0 14px;font-size:14px;color:var(--mute)}
+.contrib{display:grid;grid-template-columns:150px 1fr 54px;gap:4px 8px;align-items:center;font-size:13px;margin-top:10px}
+.contrib .nm{line-height:1.2}.contrib .nm small{display:block;color:var(--mute)}
+.track{position:relative;height:14px}
+.track:before{content:"";position:absolute;left:50%;top:0;bottom:0;border-left:1px solid var(--mute)}
+.track i{position:absolute;top:2px;bottom:2px;border-radius:2px}
+.contrib .v{text-align:right;font-variant-numeric:tabular-nums}
+.about{max-width:760px}
+.about p,.about li{color:var(--ink)}
+.about code,pre{font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;overflow-x:auto}
+@media (max-width:520px){.contrib{grid-template-columns:110px 1fr 50px}}
+</style>
+</head>
+<body>
+<main id="hs-root">
+<h1>Invasion horizon scanner</h1>
+<p class="sub">Which species not yet recorded in a country are most likely to become invasive there?</p>
+<span class="sim">Simulated demo data. Species names and values are made up.</span>
+
+<div class="tabs" role="tablist">
+<button role="tab" id="t-scan" aria-selected="true">Scanner</button>
+<button role="tab" id="t-info" aria-selected="false">About the model</button>
+</div>
+
+<section id="p-scan">
+<div class="panel form">
+<div><label for="country">Country</label><select id="country"></select></div>
+<div><label for="n">List length (1 to 35,000)</label>
+<div class="lenbox"><input id="n" type="number" min="1" max="35000" value="500"><input id="nr" type="range" min="0" max="1000" aria-label="List length slider"></div></div>
+<button class="go" id="go">Generate list</button>
+</div>
+
+<div id="results" hidden>
+<div class="stats" aria-live="polite">
+<div><b id="s-n">–</b><span>Species in list</span></div>
+<div><b id="s-p">–</b><span>Mean invasion risk</span></div>
+<div><b id="s-e">–</b><span>Mean uncertainty</span></div>
+<div><b id="s-h">–</b><span>Assessed as Major or Massive</span></div>
+</div>
+
+<div class="panel filters">
+<div class="row"><label>Taxonomic group</label><span id="gchips" class="row"></span></div>
+<div class="row"><label>EICAT category</label><span id="echips" class="row"></span></div>
+<details class="ec"><summary>What do the EICAT categories mean?</summary><p class="muted" style="margin:8px 0">EICAT rates the documented harm a species has done to native species where it is already established, not its predicted impact here.</p><div id="edef2"></div></details>
+<div class="row"><label for="fp">Minimum risk</label><div class="sl"><input id="fp" type="range" min="0" max="100" value="0"><output id="fpo">0%</output></div>
+<label for="fe" style="margin-left:16px;min-width:0">Maximum uncertainty</label><div class="sl"><input id="fe" type="range" min="1" max="40" value="40"><output id="feo">40%</output></div></div>
+</div>
+
+<div class="charts panel">
+<div><h3>Uncertainty vs invasion risk</h3><canvas id="c1"></canvas><div class="tip" id="tip1" hidden></div><p class="cnote" id="n1"></p></div>
+<div><h3>Invasion risk vs EICAT score</h3><canvas id="c2"></canvas><div class="tip" id="tip2" hidden></div><p class="cnote" id="n2"></p></div>
+</div>
+
+<div class="panel">
+<div class="tbar"><span class="xm" id="xm" aria-live="polite">Exports the filtered list in its current sort order.</span><button class="more" id="exp">Export list as CSV</button></div>
+<div class="tw"><table><thead><tr id="hd"></tr></thead><tbody id="tb"></tbody></table></div>
+<p class="muted" id="empty" hidden>No species match these filters.</p>
+<button class="more" id="more">Show 25 more</button>
+<p class="cnote">Select a column heading to sort. Select a row to see how each feature pushed the prediction up or down.</p>
+</div>
+</div>
+</section>
+
+<section id="p-info" class="about" hidden>
+<h2>What this shows</h2>
+<p>For a chosen country, the model scores every species that has no recorded alien or native presence there and ranks them by the probability that they would establish as an invasive alien species. Each score comes with an uncertainty estimate and, where one exists, the species' EICAT impact category.</p>
+<h2>Data used</h2>
+<ul>
+<li><b>SINAS</b> alien and native species records per country. Established alien records are the positive labels; native records feed the species' realised climate niche.</li>
+<li><b>GloBI</b> species interactions, plus genus-, family- and order-level interactions, sorted into resource, enemy, mutualism and competition links.</li>
+<li><b>GBIF</b> occurrence-based presence per species and country, and the taxonomy (genus up to kingdom) used to link species.</li>
+<li><b>Country climate</b>: latitude, longitude, mean temperature, temperature seasonality, frost days, precipitation and aridity index, scaled to 0–1.</li>
+<li><b>BACI trade data</b> (HS17, 2019), grouped into five ecological channels: flora and timber, aquatic fauna, terrestrial pets, agricultural hitchhikers and microbial risk.</li>
+</ul>
+<h2>How the model works</h2>
+<ul>
+<li>A two-layer heterogeneous GraphSAGE network learns a 64-dimension embedding per species from the interaction and taxonomy graph.</li>
+<li>An autoencoder compresses the seven climate variables of each country into 32 dimensions.</li>
+<li>A five-stream classifier combines: graph topology, Mahalanobis climate-niche distance, per-axis climate suitability, trade pathways and biotic opportunity. A detached climate gate suppresses scores for species that are climatically unsuited.</li>
+<li>Biotic opportunity is the share of a species' helpful partners (food, hosts, pollinators) and harmful partners (predators, parasites, competitors) already present in the target country.</li>
+<li>Trade exposure is routed through the countries where the species is confirmed present.</li>
+<li>Training uses known invasions as positives against sampled negatives, with 5-fold cross-validation. The production model is then trained on all positives.</li>
+<li>Species already recorded in the country are excluded. The workflow can also check candidates against live GBIF occurrence counts.</li>
+</ul>
+<h2>Feature contributions</h2>
+<p>The detail panel uses Integrated Gradients on the model's pre-sigmoid score, against an average-country baseline. It shows 21 contributions: seven climate axes, five trade channels for imports and five for exports, positive and negative biotic opportunity, and the two relational blocks (species embedding, country latent). They add up to the difference between the predicted and baseline score. Red bars raise risk; blue bars lower it.</p>
+<h2>How uncertainty is calculated</h2>
+<p>The ± value is the uncertainty of each prediction, estimated with Monte Carlo dropout. The classifier and the trade encoder keep their dropout layers switched on, and each species–country pair is scored 30 separate times. Every pass drops a different random set of connections, so the passes give slightly different probabilities.</p>
+<ul>
+<li><b>Invasion risk</b> is the mean probability over the 30 passes.</li>
+<li><b>Uncertainty (±)</b> is the standard deviation of those 30 probabilities. A wide spread means the model's answer depends on which connections were active, so the prediction is less certain. It is shown in percentage points, and the charts and the maximum-uncertainty filter use it.</li>
+<li><b>Standard error</b> is the standard deviation divided by √30. It describes how precisely the mean was estimated from 30 passes, so it shrinks as you add passes. Both values are in the CSV export (<code>uncertainty_sd</code> and <code>uncertainty_se_30_passes</code>).</li>
+</ul>
+<p>This captures the model's own uncertainty. It does not cover gaps or errors in the input data, such as missing records or unrecorded interactions.</p>
+<h2>EICAT impact categories</h2>
+<p>EICAT (Environmental Impact Classification for Alien Taxa) is the IUCN standard for rating how much harm an alien species has caused to native species and ecosystems. The category is based on documented impacts, mostly from places where the species is already established. It shows what the species has done elsewhere. It does not predict impact in the selected country. A species receives the highest category supported by any of its impact records.</p>
+<div id="edef"></div>
+<p>Impacts are recorded through twelve mechanisms: competition, predation, hybridisation, disease transmission, parasitism, poisoning or toxicity, bio-fouling, grazing or browsing, impacts on ecosystem chemistry, physical structure or fire, and indirect impacts through other species.</p>
+<p>The supplied notebook does not produce EICAT categories. In the demo they stand in for a lookup joined on GBIF ID. Most species have never been assessed, so many rows show NE or DD.</p>
+<h2>Plugging in the real model</h2>
+<p>All data goes through two functions that currently simulate results. To use a live backend, host this file with your platform and call <code>HorizonScanner.configure</code>. The page listens for no inputs from the host, but fires a <code>horizonscanner:select</code> event when a species is opened.</p>
+<pre>HorizonScanner.configure({ apiBase: "/api/horizon" });
+
+GET {apiBase}/scan?country=Belgium&amp;n=500
+ -> { rows: [{ gbif_id, taxon_name, group, probability,
+                 uncertainty, uncertainty_se, eicat }] }
+    uncertainty: SD of the probability over the MC-dropout passes
+    uncertainty_se: SD / sqrt(n_passes)  (optional)
+    group: plant | invertebrate | fish | herp | bird | mammal | fungi
+    eicat: MC | MN | MO | MR | MV | DD | NE   (rows sorted by probability)
+
+GET {apiBase}/explain?gbif_id=123&amp;country=Belgium
+ -> { baseline_probability, probability,
+      contributions: [{ block, name, value }] }   // value in logit units
+    block: climate | trade | biotic | relational
+
+document.addEventListener("horizonscanner:select", e =&gt; e.detail)</pre>
+<p class="muted">Live calls only work when the page is served from a domain allowed to reach your API; the demo hosted on claude.ai cannot make them.</p>
+</section>
+</main>
+
+<aside id="drawer" aria-label="Prediction details"><button class="x" id="dx" aria-label="Close">×</button><div id="dbody"></div></aside>
+
+<script>
+var HS={apiBase:null};
+window.HorizonScanner={configure:function(o){Object.assign(HS,o)}};
+var GROUPS=[
+{k:"plant",n:"Plants",c:"#3a9d5d",s:"circle"},{k:"invertebrate",n:"Invertebrates",c:"#e08a1e",s:"tri"},
+{k:"fish",n:"Fish",c:"#2f80c9",s:"square"},{k:"herp",n:"Amphibians & reptiles",c:"#8a5fc0",s:"diamond"},
+{k:"bird",n:"Birds",c:"#d0485f",s:"hex"},{k:"mammal",n:"Mammals",c:"#b5894f",s:"plus"},{k:"fungi",n:"Fungi & microbes",c:"#9aa7b4",s:"down"}];
+var GW=[.34,.3,.07,.06,.07,.05,.11];
+var SH={tri:[[0,-1],[.95,.8],[-.95,.8]],down:[[0,1],[.95,-.8],[-.95,-.8]],square:[[-.8,-.8],[.8,-.8],[.8,.8],[-.8,.8]],diamond:[[0,-1],[1,0],[0,1],[-1,0]],
+hex:[[1,0],[.5,.87],[-.5,.87],[-1,0],[-.5,-.87],[.5,-.87]],plus:[[-.3,-1],[.3,-1],[.3,-.3],[1,-.3],[1,.3],[.3,.3],[.3,1],[-.3,1],[-.3,.3],[-1,.3],[-1,-.3],[-.3,-.3]]};
+var EIC=["MC","MN","MO","MR","MV"],ECATS=EIC.concat(["DD","NE"]);
+var COUNTRIES=["Belgium","Netherlands","France","Germany","United Kingdom","Spain","Portugal","Italy","Ireland","Denmark","Sweden","Norway","Finland","Poland","Austria","Switzerland","Greece","Turkey","Ukraine","Romania","Canada","United States","Mexico","Brazil","Argentina","Chile","Colombia","Peru","South Africa","Kenya","Egypt","Morocco","Nigeria","Madagascar","Saudi Arabia","India","China","Japan","South Korea","Indonesia","Thailand","Vietnam","Australia","New Zealand"];
+var FEATS=[["climate","latitude"],["climate","longitude"],["climate","mean temperature"],["climate","temperature seasonality"],["climate","frost days"],["climate","precipitation"],["climate","aridity index"]];
+["flora & timber","aquatic fauna","terrestrial pets","agri hitchhikers","microbial risk"].forEach(function(c){FEATS.push(["trade","import: "+c])});
+["flora & timber","aquatic fauna","terrestrial pets","agri hitchhikers","microbial risk"].forEach(function(c){FEATS.push(["trade","export: "+c])});
+FEATS.push(["biotic","helpful partners present"],["biotic","harmful partners present"],["relational","species graph embedding"],["relational","country climate latent"]);
+
+var EDEF=[["MC","Minimal concern","No known negative effect on native species at the places where it has been recorded."],
+["MN","Minor","Lowers the fitness of individual native animals or plants, but does not reduce native population sizes."],
+["MO","Moderate","Reduces the population size of at least one native species, but causes no local extinction and no change in community makeup."],
+["MR","Major","Causes local extinction of at least one native species and changes community composition. The effects would reverse within about 10 years if the alien were removed."],
+["MV","Massive","Causes the replacement or extinction of native species, with community changes that would last more than 10 years after removal."],
+["DD","Data deficient","Some impact is documented, but not enough to assign a category."],
+["NE","Not evaluated","No EICAT assessment has been made for this species."]];
+function edefHTML(){return EDEF.map(function(d){return'<div class="ed"><span class="eb e-'+d[0]+'">'+d[0]+'</span><div><b>'+d[1]+'</b><br><span class="muted">'+d[2]+'</span></div></div>'}).join("")}
+var $=function(s){return document.querySelector(s)};
+function hash(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function gauss(R){return Math.sqrt(-2*Math.log(R()+1e-9))*Math.cos(6.2832*R())}
+function sig(x){return 1/(1+Math.exp(-x))}function logit(p){return Math.log(p/(1-p))}
+function choose(R,a){return a[Math.floor(R()*a.length)]}
+var PRE=["Ana","Bor","Cal","Del","Eri","Fal","Gor","Hel","Ili","Jur","Kal","Lum","Mar","Nor","Oph","Pel","Rho","Sal","Tor","Ver","Xan","Zyg"],MID=["a","e","i","o","u","ia","ella","ina","ora"],END=["us","a","ia","ium","is","ops","ax","ella"],EP=["ferox","lata","minor","vagans","robusta","rapax","tenuis","communis","pallida","major","nitida","glabra"];
+function nm(R){return choose(R,PRE)+choose(R,MID).slice(0,2)+choose(R,END)+" "+choose(R,EP)}
+
+var cache={};
+function simAll(c){if(cache[c])return cache[c];var R=rng(hash(c)),bias=GROUPS.map(function(){return R()*1.2-.6}),rows=[];
+for(var i=0;i<35000;i++){var u=R(),g=0,a=GW[0];while(u>a&&g<6){g++;a+=GW[g]}
+var p=sig(-3.4+1.35*gauss(R)+bias[g]),e=Math.min(.4,(.015+.2*Math.sqrt(p*(1-p))*(.5+R()))*(g==6||g==1?1.3:1)),ei="NE",es=-1,r=R();
+if(r<.07)ei="DD";else if(r>=.5){es=Math.max(0,Math.min(4,Math.round(p*3.6+gauss(R)*.8)));ei=EIC[es]}
+rows.push({id:1000000+i*13+g,name:nm(R),g:g,p:p,e:e,ei:ei,es:es,j:R()-.5})}
+rows.sort(function(a,b){return b.p-a.p});return cache[c]=rows}
+
+function normRow(r){var gi=GROUPS.findIndex(function(g){return g.k==r.group}),es=EIC.indexOf(r.eicat);
+return{id:r.gbif_id,name:r.taxon_name,g:Math.max(gi,0),p:r.probability,e:(r.uncertainty!=null?r.uncertainty:r.error),se:r.uncertainty_se,ei:r.eicat,es:es,j:(hash(String(r.gbif_id))%1000)/1000-.5}}
+async function apiScan(c,n){
+if(HS.apiBase){var j=await(await fetch(HS.apiBase+"/scan?country="+encodeURIComponent(c)+"&n="+n)).json();return j.rows.map(normRow)}
+await new Promise(function(r){setTimeout(r,350)});return simAll(c).slice(0,n)}
+async function apiExplain(r,c){
+if(HS.apiBase){return await(await fetch(HS.apiBase+"/explain?gbif_id="+r.id+"&country="+encodeURIComponent(c))).json()}
+var R=rng(hash(c+r.id)),base=.12,t=logit(r.p)-logit(base),raw=FEATS.map(function(f){return gauss(R)*(f[0]=="climate"?.9:f[0]=="trade"?.35:.6)}),m=raw.reduce(function(a,b){return a+b},0)/raw.length;
+return{baseline_probability:base,probability:r.p,contributions:FEATS.map(function(f,i){return{block:f[0],name:f[1],value:raw[i]-m+t/raw.length}})}}
+
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim()}
+function symSVG(g,s){var G=GROUPS[g],i=SH[G.s];return'<svg width="'+s+'" height="'+s+'" viewBox="-1.2 -1.2 2.4 2.4" aria-hidden="true">'+(i?'<polygon points="'+i.map(function(q){return q.join(",")}).join(" ")+'"':'<circle r="1"')+' fill="'+G.c+'"/></svg>'}
+function drawSym(x,g,cx,cy,r){var G=GROUPS[g],i=SH[G.s];x.fillStyle=G.c;x.beginPath();
+if(!i)x.arc(cx,cy,r,0,6.2832);else i.forEach(function(q,k){k?x.lineTo(cx+q[0]*r,cy+q[1]*r):x.moveTo(cx+q[0]*r,cy+q[1]*r)});x.closePath();x.fill()}
+
+var all=[],view=[],shown=25,country="Belgium",fg=new Set(GROUPS.map(function(_,i){return i})),fe=new Set(ECATS);
+var sel=$("#country");COUNTRIES.forEach(function(c){sel.add(new Option(c,c))});
+var nIn=$("#n"),nR=$("#nr"),LM=Math.log10(35000);
+function setN(v){v=Math.max(1,Math.min(35000,Math.round(v)||1));nIn.value=v;nR.value=Math.round(Math.log10(v)/LM*1000)}
+nIn.oninput=function(){setN(nIn.value)};nR.oninput=function(){nIn.value=Math.round(Math.pow(10,nR.value/1000*LM))};setN(500);
+
+GROUPS.forEach(function(g,i){var b=document.createElement("button");b.className="chip";b.setAttribute("aria-pressed","true");b.innerHTML=symSVG(i,12)+g.n;
+b.onclick=function(){fg.has(i)?fg.delete(i):fg.add(i);b.setAttribute("aria-pressed",fg.has(i));apply()};$("#gchips").appendChild(b)});
+ECATS.forEach(function(k){var b=document.createElement("button");b.className="chip";b.setAttribute("aria-pressed","true");b.textContent=k;b.title=EDEF.find(function(d){return d[0]==k})[1];
+b.onclick=function(){fe.has(k)?fe.delete(k):fe.add(k);b.setAttribute("aria-pressed",fe.has(k));apply()};$("#echips").appendChild(b)});
+$("#fp").oninput=function(){$("#fpo").textContent=this.value+"%";apply()};
+$("#fe").oninput=function(){$("#feo").textContent=this.value+"%";apply()};
+
+var sk="rank",sd=1,COLS=[["rank","#",1],["name","Species",1],["g","Group",1],["p","Invasion risk",-1],["e","Uncertainty (±)",-1],["es","EICAT",-1]];
+var SKEY={rank:function(r){return r.rank},name:function(r){return r.name},g:function(r){return GROUPS[r.g].n},p:function(r){return r.p},e:function(r){return r.e},es:function(r){return r.ei=="NE"?-2:r.ei=="DD"?-1:r.es}};
+function sortView(){var f=SKEY[sk];view.sort(function(a,b){var x=f(a),y=f(b),c=typeof x=="string"?x.localeCompare(y):x-y;return(c||a.rank-b.rank)*(c?sd:1)})}
+function hdr(){$("#hd").innerHTML=COLS.map(function(c){var on=c[0]==sk;return'<th'+(on?' aria-sort="'+(sd>0?"ascending":"descending")+'"':"")+'><button class="sb" data-k="'+c[0]+'">'+c[1]+' <span>'+(on?(sd>0?"▲":"▼"):"")+'</span></button></th>'}).join("")}
+$("#hd").onclick=function(e){var b=e.target.closest("button");if(!b)return;var k=b.dataset.k;if(k==sk)sd=-sd;else{sk=k;sd=COLS.find(function(c){return c[0]==k})[2]}hdr();sortView();render()};
+function apply(){var mp=$("#fp").value/100,me=$("#fe").value/100;
+view=all.filter(function(r){return r.p>=mp&&r.e<=me+1e-9&&fg.has(r.g)&&fe.has(r.ei)});sortView();shown=25;render()}
+hdr();
+function pc(x){return(x*100).toFixed(1)+"%"}
+function render(){
+var n=view.length,mean=function(k){return n?view.reduce(function(a,r){return a+r[k]},0)/n:0};
+$("#s-n").textContent=n.toLocaleString("en")+(n<all.length?" of "+all.length.toLocaleString("en"):"");
+$("#s-p").textContent=n?pc(mean("p")):"–";$("#s-e").textContent=n?"± "+pc(mean("e")):"–";
+$("#s-h").textContent=view.filter(function(r){return r.es>=3}).length.toLocaleString("en");
+$("#tb").innerHTML=view.slice(0,shown).map(function(r,i){return'<tr tabindex="0" data-i="'+i+'"><td>'+r.rank+'</td><td><i>'+r.name+'</i></td><td>'+symSVG(r.g,14)+GROUPS[r.g].n+'</td><td><span class="rb"><span style="width:'+r.p*100+'%"></span></span>'+pc(r.p)+'</td><td>± '+pc(r.e)+'</td><td><span class="eb e-'+r.ei+'">'+r.ei+'</span></td></tr>'}).join("");
+$("#empty").hidden=n>0;$("#more").hidden=shown>=n;$("#exp").textContent="Export "+n.toLocaleString("en")+" species as CSV";$("#exp").disabled=!n;draw()}
+$("#more").onclick=function(){shown+=25;render()};
+$("#tb").onclick=function(e){var tr=e.target.closest("tr");if(tr)openD(view[tr.dataset.i])};
+$("#tb").onkeydown=function(e){if(e.key=="Enter"){var tr=e.target.closest("tr");if(tr)openD(view[tr.dataset.i])}};
+
+function plot(cv,pts,o){var d=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*d;cv.height=h*d;var x=cv.getContext("2d");x.scale(d,d);
+var m={l:48,r:10,t:8,b:38},pw=w-m.l-m.r,ph=h-m.t-m.b,X=function(v){return m.l+(v-o.x0)/(o.x1-o.x0)*pw},Y=function(v){return m.t+ph-(v-o.y0)/(o.y1-o.y0)*ph};
+x.font='12px "Instrument Sans",system-ui,sans-serif';x.strokeStyle=css("--line");x.fillStyle=css("--mute");x.lineWidth=1;
+o.xt.forEach(function(t){x.beginPath();x.moveTo(X(t[0]),m.t);x.lineTo(X(t[0]),m.t+ph);x.stroke();x.textAlign="center";x.fillText(t[1],X(t[0]),m.t+ph+15)});
+o.yt.forEach(function(t){x.beginPath();x.moveTo(m.l,Y(t[0]));x.lineTo(m.l+pw,Y(t[0]));x.stroke();x.textAlign="right";x.fillText(t[1],m.l-6,Y(t[0])+4)});
+x.textAlign="center";x.fillText(o.xl,m.l+pw/2,h-4);x.save();x.translate(11,m.t+ph/2);x.rotate(-1.5708);x.fillText(o.yl,0,0);x.restore();
+cv._hit=[];x.globalAlpha=.7;pts.forEach(function(r){var px=X(o.fx(r)),py=Y(o.fy(r));cv._hit.push([px,py,r]);drawSym(x,r.g,px,py,3.6)});x.globalAlpha=1;
+var h2=cv._hit.find(function(q){return q[2]===picked});if(h2){x.strokeStyle=css("--ink");x.lineWidth=2;x.beginPath();x.arc(h2[0],h2[1],8,0,6.2832);x.stroke()}}
+function sample(a,k){if(a.length<=k)return a;var s=a.length/k,o=[];for(var i=0;i<k;i++)o.push(a[Math.floor(i*s)]);return o}
+function draw(){if($("#results").hidden)return;hideTips();if(picked&&view.indexOf(picked)<0)picked=null;var v=sample(view,2500);if(picked&&v.indexOf(picked)<0)v.push(picked);var emax=Math.max(.05,Math.ceil(Math.max.apply(null,view.map(function(r){return r.e}).concat([0]))*20)/20);
+var pt=[0,.25,.5,.75,1].map(function(t){return[t,Math.round(t*100)+"%"]});
+plot($("#c1"),v,{x0:0,x1:1,y0:0,y1:emax,xt:pt,yt:[0,.25,.5,.75,1].map(function(t){return[t*emax,"±"+Math.round(t*emax*100)+"%"]}),xl:"Invasion risk",yl:"Uncertainty (SD)",fx:function(r){return r.p},fy:function(r){return r.e}});
+$("#n1").textContent="Showing "+v.length.toLocaleString("en")+" of "+view.length.toLocaleString("en")+" species. Select a point to see its name.";
+var ev=view.filter(function(r){return r.es>=0}),ev2=sample(ev,2500);if(picked&&picked.es>=0&&ev2.indexOf(picked)<0)ev2.push(picked);var x0=ev.length?Math.floor(Math.min.apply(null,ev.map(function(r){return r.p}))*20)/20:0,x1=ev.length?Math.min(1,Math.ceil(Math.max.apply(null,ev.map(function(r){return r.p}))*20)/20):1;if(x1<=x0)x1=x0+.05;
+plot($("#c2"),ev2,{x0:x0,x1:x1,y0:-.6,y1:4.6,xt:[0,.25,.5,.75,1].map(function(t){var q=x0+t*(x1-x0);return[q,Math.round(q*100)+"%"]}),yt:EIC.map(function(k,i){return[i,k]}),xl:"Invasion risk",yl:"EICAT category",fx:function(r){return r.p},fy:function(r){return r.es+r.j*.7}});
+$("#n2").textContent="Only species with an EICAT assessment: "+ev.length.toLocaleString("en")+" of "+view.length.toLocaleString("en")+". Points are jittered vertically. Select a point to see its name."}
+var picked=null;
+function hideTips(){$("#tip1").hidden=true;$("#tip2").hidden=true}
+function hitAt(cv,e){var b=cv.getBoundingClientRect(),mx=e.clientX-b.left,my=e.clientY-b.top,best=null,bd=100;
+(cv._hit||[]).forEach(function(q){var d=(q[0]-mx)*(q[0]-mx)+(q[1]-my)*(q[1]-my);if(d<bd){bd=d;best=q}});return best}
+[["#c1","#tip1"],["#c2","#tip2"]].forEach(function(ids){var cv=$(ids[0]),tp=$(ids[1]);
+cv.onmousemove=function(e){cv.style.cursor=hitAt(cv,e)?"pointer":"default"};
+cv.onclick=function(e){var h=hitAt(cv,e);if(!h){picked=null;hideTips();draw();return}
+picked=h[2];var r=picked;draw();var q=cv._hit.find(function(z){return z[2]===r})||h;tp.hidden=false;
+tp.innerHTML='<i>'+r.name+'</i><br>'+symSVG(r.g,12)+GROUPS[r.g].n+'<br>Risk '+pc(r.p)+' ± '+pc(r.e)+' · EICAT '+r.ei+'<br><button>Show contributions</button>';
+tp.querySelector("button").onclick=function(){openD(r)};
+var w=cv.clientWidth;tp.style.left=Math.max(0,Math.min(q[0]+12,w-tp.offsetWidth))+"px";tp.style.top=Math.max(0,Math.min(q[1]+12,cv.clientHeight-tp.offsetHeight))+"px"}});
+addEventListener("resize",draw);matchMedia("(prefers-color-scheme:dark)").addEventListener("change",function(){setTimeout(draw,50)});
+
+async function run(){var b=$("#go");b.disabled=true;b.textContent="Generating…";country=sel.value;
+try{var rows=await apiScan(country,+nIn.value);all=rows.map(function(r,i){return Object.assign({},r,{rank:i+1})});$("#results").hidden=false;apply()}
+catch(e){alert("Could not load the list: "+e.message)}finally{b.disabled=false;b.textContent="Generate list"}}
+$("#go").onclick=run;
+
+function csvCell(v){v=v==null?"":String(v);return/[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
+function toCSV(h,rows){return"\ufeff"+[h].concat(rows).map(function(r){return r.map(csvCell).join(",")}).join("\r\n")}
+async function saveFile(name,text,el){var ok=false;
+try{var d=window.claude&&await window.claude.use("downloads");if(d){await d.save({filename:name,data:text});ok=true}}
+catch(e){if(e&&e.code=="declined"){el.textContent="Export cancelled.";return}}
+if(!ok){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:"text/csv;charset=utf-8"}));a.download=name;document.body.appendChild(a);a.click();a.remove()}
+el.textContent="Exported "+name}
+function fname(t){return"horizon-scan_"+country.replace(/\s+/g,"_")+"_"+t+".csv"}
+var LH=["rank","gbif_id","taxon_name","taxonomic_group","target_country","invasion_probability","uncertainty_sd","uncertainty_se_30_passes","eicat_category","eicat_rank_0_MC_to_4_MV"];
+function lrow(r){return[r.rank,r.id,r.name,GROUPS[r.g].n,country,r.p.toFixed(5),r.e.toFixed(5),(r.se!=null?r.se:r.e/Math.sqrt(30)).toFixed(5),r.ei,r.es>=0?r.es:""]}
+$("#exp").onclick=function(){saveFile(fname(view.length+"_species"),toCSV(LH,view.map(lrow)),$("#xm"))};
+var lastX=null;
+async function openD(r){var d=$("#drawer");d.classList.add("open");$("#dbody").innerHTML='<h3>'+r.name+'</h3><p class="muted">Loading contributions…</p>';
+document.dispatchEvent(new CustomEvent("horizonscanner:select",{detail:{gbif_id:r.id,taxon_name:r.name,country:country,probability:r.p,uncertainty:r.e,eicat:r.ei,group:GROUPS[r.g].k}}));
+try{var x=await apiExplain(r,country),c=x.contributions.slice().sort(function(a,b){return Math.abs(b.value)-Math.abs(a.value)}),mx=Math.max.apply(null,c.map(function(q){return Math.abs(q.value)}))||1,sum=c.reduce(function(a,q){return a+q.value},0);
+$("#dbody").innerHTML='<h3>'+r.name+'</h3><div class="meta"><span>'+symSVG(r.g,13)+GROUPS[r.g].n+'</span><span>Rank '+r.rank+' for '+country+'</span><span>EICAT <span class="eb e-'+r.ei+'">'+r.ei+'</span></span></div>'
++'<p style="margin:0"><b style="font-size:24px">'+pc(r.p)+'</b> <span class="muted">invasion risk, ± '+pc(r.e)+'</span></p>'
++'<p class="muted" style="margin:4px 0 0;font-size:13px">An average species–country pair scores '+pc(x.baseline_probability)+'. The contributions below move the score by '+(sum>=0?"+":"")+sum.toFixed(2)+' (logit units).</p>'
++'<div class="contrib">'+c.map(function(q){var w=Math.abs(q.value)/mx*50;return'<div class="nm">'+q.name+'<small>'+q.block+'</small></div><div class="track"><i style="background:var('+(q.value>=0?"--pos":"--neg")+');'+(q.value>=0?"left:50%":"right:50%")+';width:'+w+'%"></i></div><div class="v">'+(q.value>=0?"+":"−")+Math.abs(q.value).toFixed(2)+'</div>'}).join("")+'</div>'
++'<p class="cnote">Red raises the risk, blue lowers it. Method: Integrated Gradients against an average-country baseline.</p>'
++'<div class="dx"><button class="more" id="dexp">Export this species as CSV</button> <span class="xm" id="dxm" aria-live="polite"></span></div>';
+$("#dexp").onclick=function(){saveFile(fname(r.name.replace(/\s+/g,"_")),toCSV(LH.concat(["baseline_probability","feature_block","feature","contribution_logit"]),c.map(function(q){return lrow(r).concat([x.baseline_probability.toFixed(5),q.block,q.name,q.value.toFixed(5)])})),$("#dxm"))}}
+catch(e){$("#dbody").innerHTML='<h3>'+r.name+'</h3><p class="muted">Could not load contributions.</p>'}}
+$("#dx").onclick=function(){$("#drawer").classList.remove("open")};
+addEventListener("keydown",function(e){if(e.key=="Escape")$("#drawer").classList.remove("open")});
+
+function tab(a){$("#p-scan").hidden=a!="scan";$("#p-info").hidden=a!="info";$("#t-scan").setAttribute("aria-selected",a=="scan");$("#t-info").setAttribute("aria-selected",a=="info");if(a=="scan")draw()}
+$("#t-scan").onclick=function(){tab("scan")};$("#t-info").onclick=function(){tab("info")};
+$("#edef").innerHTML=edefHTML();$("#edef2").innerHTML=edefHTML();
+run();
+</script>
+</body>
+</html>
