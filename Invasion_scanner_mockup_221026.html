@@ -331,11 +331,27 @@ el.textContent="Exported "+name}
 function fname(t){return"horizon-scan_"+country.replace(/\s+/g,"_")+"_"+t+".csv"}
 var LH=["rank","gbif_id","taxon_name","taxonomic_group","target_country","invasion_probability","uncertainty_sd","uncertainty_se_30_passes","eicat_category","eicat_rank_0_MC_to_4_MV"];
 function lrow(r){return[r.rank,r.id,r.name,GROUPS[r.g].n,country,r.p.toFixed(5),r.e.toFixed(5),(r.se!=null?r.se:r.e/Math.sqrt(30)).toFixed(5),r.ei,r.es>=0?r.es:""]}
-$("#exp").onclick=function(){saveFile(fname(view.length+"_species"),toCSV(LH,view.map(lrow)),$("#xm"))};
+var XC={};
+function xkey(r){return country+"|"+r.id}
+function cname(q){return "contrib_"+q.block+"_"+q.name.replace(/[^A-Za-z0-9]+/g,"_").replace(/^_|_$/g,"").toLowerCase()}
+async function getX(r){var k=xkey(r);if(!XC[k])XC[k]=apiExplain(r,country).catch(function(e){delete XC[k];throw e});return XC[k]}
+var exporting=false;
+$("#exp").onclick=async function(){if(exporting)return;exporting=true;var b=$("#exp"),xm=$("#xm"),rows=view.slice(),n=rows.length,done=0,res=new Array(n),fail=0,lab=b.textContent;
+b.disabled=true;xm.textContent="Computing contributions… 0 / "+n.toLocaleString("en");
+var i=0;async function worker(){while(i<n){var j=i++;try{res[j]=await getX(rows[j])}catch(e){res[j]=null;fail++}done++;if(done%25==0||done==n)xm.textContent="Computing contributions… "+done.toLocaleString("en")+" / "+n.toLocaleString("en")}}
+try{await Promise.all(Array.from({length:Math.min(8,n)},worker));
+var cols=[],seen={};res.forEach(function(x){if(x)x.contributions.forEach(function(q){var c=cname(q);if(!seen[c]){seen[c]=1;cols.push(c)}})});
+var H=LH.concat(["baseline_probability"],cols,["contribution_sum_logit"]);
+var out=rows.map(function(r,j){var x=res[j],m={},sum=0;if(x)x.contributions.forEach(function(q){m[cname(q)]=q.value;sum+=q.value});
+return lrow(r).concat([x?x.baseline_probability.toFixed(5):""],cols.map(function(c){return m[c]!=null?m[c].toFixed(5):""}),[x?sum.toFixed(5):""])});
+await saveFile(fname(n+"_species"),toCSV(H,out),xm);
+if(fail)xm.textContent+=" ("+fail+" species had no contributions and were left blank)"}
+catch(e){xm.textContent="Export failed: "+e.message}
+finally{exporting=false;b.disabled=!view.length}};
 var lastX=null;
 async function openD(r){var d=$("#drawer");d.classList.add("open");$("#dbody").innerHTML='<h3>'+r.name+'</h3><p class="muted">Loading contributions…</p>';
 document.dispatchEvent(new CustomEvent("horizonscanner:select",{detail:{gbif_id:r.id,taxon_name:r.name,country:country,probability:r.p,uncertainty:r.e,eicat:r.ei,group:GROUPS[r.g].k}}));
-try{var x=await apiExplain(r,country),c=x.contributions.slice().sort(function(a,b){return Math.abs(b.value)-Math.abs(a.value)}),mx=Math.max.apply(null,c.map(function(q){return Math.abs(q.value)}))||1,sum=c.reduce(function(a,q){return a+q.value},0);
+try{var x=await getX(r),c=x.contributions.slice().sort(function(a,b){return Math.abs(b.value)-Math.abs(a.value)}),mx=Math.max.apply(null,c.map(function(q){return Math.abs(q.value)}))||1,sum=c.reduce(function(a,q){return a+q.value},0);
 $("#dbody").innerHTML='<h3>'+r.name+'</h3><div class="meta"><span>'+symSVG(r.g,13)+GROUPS[r.g].n+'</span><span>Rank '+r.rank+' for '+country+'</span><span>EICAT <span class="eb e-'+r.ei+'">'+r.ei+'</span></span></div>'
 +'<p style="margin:0"><b style="font-size:24px">'+pc(r.p)+'</b> <span class="muted">invasion risk, ± '+pc(r.e)+'</span></p>'
 +'<p class="muted" style="margin:4px 0 0;font-size:13px">An average species–country pair scores '+pc(x.baseline_probability)+'. The contributions below move the score by '+(sum>=0?"+":"")+sum.toFixed(2)+' (logit units).</p>'
