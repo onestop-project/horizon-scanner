@@ -8,8 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* Layout: one working column (data loader, filters, charts, table) with a
-   detail drawer that slides in from the right. Tokens kept from the
-   original mockup so the look stays the same. */
+   detail drawer that slides in from the right. */
 :root{--bg:#f6f7f9;--ink:#1c2430;--mute:#697386;--line:#dfe3ea;--panel:#fff;--acc:#2f5d8a;--pos:#c8553d;--neg:#2f6fb0;--warn:#b7791f;
 --sans:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:ui-monospace,Menlo,Consolas,monospace}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14181f;--ink:#e8ecf2;--mute:#8d97a8;--line:#2a313c;--panel:#1b212a;--acc:#6fa3d6;--pos:#ef7f66;--neg:#6fa3d6;--warn:#e0a84a;color-scheme:dark}}
@@ -88,7 +87,7 @@ canvas{width:100%;height:280px;display:block}
 .cnote{font-size:12px;color:var(--mute);margin:4px 0 0}
 .tw{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:14px}
-#tbl{min-width:920px}
+#tbl{min-width:1020px}
 th{text-align:left;font-weight:500;color:var(--mute);font-size:13px;padding:6px 10px;border-bottom:1px solid var(--line)}
 td{padding:8px 10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;vertical-align:middle}
 #tbl tbody tr{cursor:pointer}#tbl tbody tr:hover{background:color-mix(in srgb,var(--acc) 8%,transparent)}
@@ -96,9 +95,20 @@ td svg{vertical-align:-2px;margin-right:4px}
 td.drv{font-size:13px;color:var(--mute);max-width:220px}
 .rb{display:inline-block;width:70px;height:6px;background:var(--line);border-radius:3px;margin-right:8px;vertical-align:middle;overflow:hidden}
 .rb span{display:block;height:100%;background:var(--acc)}
-.eb{display:inline-block;min-width:34px;text-align:center;font-size:12px;font-weight:600;border-radius:5px;padding:1px 7px}
-.e-MC{background:#a9d4b0;color:#14301b}.e-MN{background:#ead877;color:#3a3100}.e-MO{background:#f2a954;color:#3d2300}.e-MR{background:#e26a3f;color:#fff}.e-MV{background:#a6242a;color:#fff}
-.e-DD,.e-NE{border:1px solid var(--line);color:var(--mute)}
+/* EICAT / SEICAT badges: filled = GIDIAS records (or a published
+   assessment in an older list), dashed outline = LLM-derived */
+.eb{display:inline-block;min-width:34px;text-align:center;font-size:12px;font-weight:600;border-radius:5px;padding:1px 7px;white-space:nowrap}
+.e-MC{--ec:#4f9a5e;background:#a9d4b0;color:#14301b}.e-MN{--ec:#b59b12;background:#ead877;color:#3a3100}.e-MO{--ec:#d9861f;background:#f2a954;color:#3d2300}.e-MR{--ec:#e26a3f;background:#e26a3f;color:#fff}.e-MV{--ec:#a6242a;background:#a6242a;color:#fff}
+.e-DD,.e-NE{--ec:var(--mute);border:1px solid var(--line);color:var(--mute)}
+.eb.llm{background:none;color:var(--ink);border:1.5px dashed var(--ec);padding:0 6px}
+.eb small{font-size:9px;font-weight:600;letter-spacing:.05em;margin-left:4px;color:var(--mute)}
+.refs{font-size:12.5px;color:var(--mute);margin:8px 0 0;overflow-wrap:anywhere}.refs a{color:var(--acc)}
+.ih{margin:14px 0 0;font-size:14px}.ih .muted{font-size:13px}
+/* checklist flags */
+.fl{display:inline-block;font-size:11.5px;font-style:normal;border:1px solid var(--warn);color:var(--warn);border-radius:4px;padding:0 5px;margin-left:6px;white-space:nowrap}
+.chk{font-size:13.5px;padding:12px 18px}
+.chk summary{cursor:pointer;color:var(--mute);font-size:13px;margin-top:6px}
+.chk table{font-size:13px;margin-top:6px}
 #more{margin-top:12px}
 /* drawer */
 #drawer{position:fixed;top:0;right:0;bottom:0;width:min(540px,100%);background:var(--panel);border-left:1px solid var(--line);padding:calc(20px + env(safe-area-inset-top,0px)) calc(20px + env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) 20px;overflow-y:auto;transform:translateX(105%);transition:transform .2s;z-index:10;box-shadow:-8px 0 24px rgba(0,0,0,.12)}
@@ -163,13 +173,13 @@ td.drv{font-size:13px;color:var(--mute);max-width:220px}
 <section id="p-scan" role="tabpanel" aria-labelledby="t-scan">
 <div class="panel loader">
 <div><h2 style="margin:0 0 2px">Import data into the viewer</h2>
-<p class="msg" style="font-size:14px">The viewer shows nothing of its own: it reads the model outputs that notebook 05 writes (CSV files per location). Import them here to see the lists, contributions and GNN saliency maps for your locations.</p></div>
+<p class="msg" style="font-size:14px">The viewer shows nothing of its own: it reads the model outputs that notebook 05 or 06 writes (CSV files per location) and the impact file that notebook 07 writes. Import them here to see the lists, contributions, GNN saliency maps and documented impacts for your locations.</p></div>
 <div class="lrow"><button class="go" id="pickf" type="button">Import model outputs…</button>
 <button class="more" id="pickd" type="button">Import a model outputs folder…</button></div>
 <label class="drop" id="drop" for="fin">
 <input id="fin" type="file" multiple accept=".csv,.json,text/csv,application/json">
 <b>Or drop model output files here</b><span>(click this box to choose them)</span>
-<span class="muted">From <code>model_outputs/exports/</code> of notebook 05: <code>scan_&lt;location&gt;.csv</code> (required per location), plus <code>contributions_</code>, <code>gnn_saliency_nodes_</code> and <code>gnn_saliency_edges_</code> files of the same location, and <code>model_card.json</code>. The combined <code>*_all_locations.csv</code> files work too. Files stay in your browser.</span>
+<span class="muted">From <code>model_outputs/exports/</code>: <code>scan_&lt;location&gt;.csv</code> (required per location), plus the <code>contributions_</code>, <code>gnn_saliency_nodes_</code>, <code>gnn_saliency_edges_</code> and <code>checks_dropped_</code> files of the same location, <code>checks_summary.csv</code>, <code>model_card.json</code> and <code>species_impacts_master.csv</code> (documented impacts, notebook 07). The combined <code>*_all_locations.csv</code> files work too. Files stay in your browser.</span>
 </label>
 <div class="lrow"><span class="msg">Imported files:</span><div class="files" id="files"></div></div>
 <div class="lrow"><button class="more" id="exbtn" type="button">Show example data instead</button>
@@ -187,33 +197,38 @@ td.drv{font-size:13px;color:var(--mute);max-width:220px}
 <div id="results" hidden>
 <div class="stats" aria-live="polite">
 <div><b id="s-n">–</b><span>Species in list</span></div>
-<div><b id="s-p">–</b><span>Mean invasion risk</span></div>
+<div><b id="s-p">–</b><span>Mean risk score</span></div>
 <div><b id="s-e">–</b><span>Mean uncertainty</span></div>
-<div><b id="s-h">–</b><span>Assessed as Major or Massive</span></div>
+<div><b id="s-h">–</b><span id="s-hl">EICAT Major or Massive</span></div>
 <div><b id="s-l">–</b><span>Low data support</span></div>
 <div><b id="s-x">–</b><span>With contributions / GNN map</span></div>
 </div>
+
+<div class="panel chk" id="chk" hidden></div>
 
 <div class="panel filters">
 <div class="row"><label for="q">Find species</label><input id="q" type="search" placeholder="Name, genus or family"></div>
 <div class="row"><label>Taxonomic group</label><span id="gchips" class="row"></span></div>
 <div class="row"><label>EICAT category</label><span id="echips" class="row"></span></div>
+<div class="row" id="srow" hidden><label>EICAT source</label><span id="srcchips" class="row"></span></div>
+<div class="row" id="serow" hidden><label>SEICAT category</label><span id="sechips" class="row"></span></div>
 <div class="row"><label>Data support</label><span id="schips" class="row"></span></div>
-<details class="ec"><summary>What do the EICAT categories mean?</summary><p class="muted" style="margin:8px 0">EICAT rates the documented harm a species has done to native species where it is already established, not its predicted impact here.</p><div id="edef2"></div></details>
-<div class="row"><label for="fp">Minimum risk</label><div class="sl"><input id="fp" type="range" min="0" max="100" value="0"><output id="fpo" for="fp">0%</output></div>
+<div class="row" id="frow" hidden><label>Checklist flags</label><span id="fchips" class="row"></span></div>
+<details class="ec"><summary>What do the EICAT and SEICAT categories mean?</summary><p class="muted" style="margin:8px 0">EICAT rates the documented harm a species has done to native species where it is already alien; SEICAT rates the harm to people's activities, on the same five steps. Neither predicts the impact here, and neither enters the risk score. A filled badge comes from GIDIAS impact records; a dashed badge marked LLM was proposed by a language model. Neither is an IUCN assessment.</p><div id="edef2"></div></details>
+<div class="row"><label for="fp">Minimum risk score</label><div class="sl"><input id="fp" type="range" min="0" max="100" value="0"><output id="fpo" for="fp">0%</output></div>
 <label for="fe" style="margin-left:16px;min-width:0">Maximum uncertainty</label><div class="sl"><input id="fe" type="range" min="1" max="40" value="40"><output id="feo" for="fe">40%</output></div></div>
 </div>
 
 <div class="charts panel">
-<div><h3>Uncertainty vs invasion risk</h3><canvas id="c1"></canvas><div class="tip" id="tip1" hidden></div><p class="cnote" id="n1"></p></div>
-<div><h3>Invasion risk vs EICAT score</h3><canvas id="c2"></canvas><div class="empty-chart" id="c2e" hidden></div><div class="tip" id="tip2" hidden></div><p class="cnote" id="n2"></p></div>
+<div><h3>Uncertainty vs risk score</h3><canvas id="c1"></canvas><div class="tip" id="tip1" hidden></div><p class="cnote" id="n1"></p></div>
+<div><h3>Risk score vs EICAT category</h3><canvas id="c2"></canvas><div class="empty-chart" id="c2e" hidden></div><div class="tip" id="tip2" hidden></div><p class="cnote" id="n2"></p></div>
 </div>
 
 <div class="panel">
 <div class="tw"><table id="tbl"><thead><tr id="hd"></tr></thead><tbody id="tb"></tbody></table></div>
 <p class="muted" id="empty" hidden>No species match these filters.</p>
 <button class="more" id="more" type="button">Show 25 more</button>
-<p class="cnote">Select a column heading to sort. Select a row to see how each feature pushed the prediction up or down, how much evidence the prediction rests on, and which graph neighbours drive the species' relational score. <b>Data support</b>: how much is known about the species (range, interactions, native range). <b>Effort shift</b>: how much the correction for documentation effort moved its risk; negative means it would have ranked higher on documentation alone.</p>
+<p class="cnote">Select a column heading to sort. Select a row to see how each feature pushed the prediction up or down, how much evidence the prediction rests on, and which graph neighbours drive the species' relational score. <b>Risk score</b>: ranks the species of this location; it is not a calibrated probability and cannot be compared between locations. <b>Data support</b>: how much is known about the species (range, interactions, native range). <b>Effort shift</b>: how much the correction for documentation effort moved its score; negative means it would have ranked higher on documentation alone. <b>EICAT</b> and <b>SEICAT</b>: documented impact where the species is already alien, read from <code>species_impacts_master.csv</code>; information for the assessment that does not enter the risk score. Filled badge: GIDIAS impact records; dashed badge marked LLM: proposed by a language model.</p>
 </div>
 </div>
 <p class="muted" id="noload" hidden>Load a <code>scan_&lt;location&gt;.csv</code> file to see a list.</p>
@@ -222,24 +237,27 @@ td.drv{font-size:13px;color:var(--mute);max-width:220px}
 <section id="p-info" class="about" role="tabpanel" aria-labelledby="t-info" hidden>
 <div id="card"></div>
 <h2>What this shows</h2>
-<p>For a chosen SInAS location, the model scores every candidate species that has no recorded alien or native presence there, and ranks them by the probability that they would establish as an alien. Candidates are species already alien somewhere else (in SInAS). Each score comes with an uncertainty estimate, the features that pushed it up or down, and, for the top species, a map of the graph neighbours behind its relational score.</p>
+<p>For a chosen SInAS location, the model scores every candidate species that has no recorded alien or native presence there, and ranks them by how likely they are to establish as an alien. Candidates are species already alien somewhere else (in SInAS). Each score comes with an uncertainty estimate, the features that pushed it up or down, and, for the top species, a map of the graph neighbours behind its relational score.</p>
+<p><b>Read the risk score as a rank.</b> It orders the species of one location. It is the model's output under its training mix of known invasions and sampled unrecorded pairs, not a calibrated probability of establishment, and it should not be compared between locations.</p>
 
 <h2>Loading results</h2>
-<p>Notebook <code>05_model_training.ipynb</code> writes these files per location to <code>model_outputs/exports/</code>. Load them together; files are matched on <code>target_country</code> and <code>gbif_id</code>, and the type of each file is recognised from its columns, so renamed files still work.</p>
+<p>Notebook <code>05_model_training.ipynb</code> (after training) and <code>06_static_scanner.ipynb</code> (from the saved model, any time) write these files per location to <code>model_outputs/exports/</code>. Notebook <code>07_species_impacts.ipynb</code> adds <code>species_impacts_master.csv</code> to the same folder. Load them together; files are matched on <code>target_country</code> and <code>gbif_id</code>, and the type of each file is recognised from its columns, so renamed files still work. When a whole folder with many locations is imported, the lists are read at once and the explanation files of a location when you open it.</p>
 <div class="tw"><table>
 <thead><tr><th>File</th><th>One row per</th><th>Used for</th></tr></thead>
 <tbody>
-<tr><td><code>scan_&lt;location&gt;.csv</code></td><td>candidate species</td><td>list, filters, charts, key facts</td></tr>
+<tr><td><code>scan_&lt;location&gt;.csv</code></td><td>candidate species</td><td>list, filters, charts, key facts, checklist flags</td></tr>
+<tr><td><code>species_impacts_master.csv</code></td><td>species</td><td>EICAT and SEICAT categories, their source and evidence, and the impact section of the detail panel. Joined to the lists on <code>gbif_id</code></td></tr>
 <tr><td><code>contributions_&lt;location&gt;.csv</code></td><td>species × feature</td><td>contribution bars in the detail panel</td></tr>
 <tr><td><code>gnn_saliency_nodes_&lt;location&gt;.csv</code></td><td>species × graph node</td><td>GNN saliency map and its node list</td></tr>
 <tr><td><code>gnn_saliency_edges_&lt;location&gt;.csv</code></td><td>species × edge</td><td>lines of the map</td></tr>
+<tr><td><code>checks_summary.csv</code>, <code>checks_dropped_&lt;location&gt;.csv</code></td><td>location; removed candidate</td><td>what the native-range and GRIIS checks removed from the list</td></tr>
 <tr><td><code>model_card.json</code></td><td>model</td><td>data dates, settings and cross-validation metrics on this tab</td></tr>
 </tbody></table></div>
-<p class="muted">Older model outputs (<code>*_horizon_scan_explained.csv</code> with <code>invasion_probability</code> and wide <code>attr_*</code> columns) are read too. Column definitions are in <code>model_training_metadata.md</code>.</p>
+<p class="muted">Column definitions are in <code>model_training_metadata.md</code>.</p>
 
 <h2>Data used</h2>
 <ul>
-<li><b>SInAS</b> alien and native records per location. Established-alien records are the positive labels.</li>
+<li><b>SInAS</b> alien and native records per location. Alien records are the positive labels.</li>
 <li><b>GloBI</b> interactions between species, and with genera, families, orders and classes, grouped into resource, enemy, mutualism and competition links.</li>
 <li><b>GBIF</b> occurrences: where each species is recorded, and the taxonomy (species up to kingdom) that links species in the graph.</li>
 <li><b>Location features</b>: WorldClim climate including within-location extremes, Köppen–Geiger climate classes, geography, GDP, population density, colonial history and native species richness.</li>
@@ -250,13 +268,17 @@ td.drv{font-size:13px;color:var(--mute);max-width:220px}
 <p>Seven streams are combined by one classifier:</p>
 <ul>
 <li><b>Relational</b>: a two-layer graph neural network learns an embedding per species from the interaction and taxonomy graph. It is matched against a compressed profile of all location features.</li>
-<li><b>Climate</b>: the species' realised climate niche (all locations where it is known to occur, native and alien, from SInAS and GBIF) compared with the target, axis by axis and as Köppen–Geiger class overlap.</li>
+<li><b>Climate niche</b> and <b>per-axis suitability</b> (two streams, one block in the charts): the species' realised climate niche (all locations where it is known to occur, native and alien, from SInAS and GBIF) compared with the target, as a whole, axis by axis, and as Köppen–Geiger class overlap.</li>
 <li><b>Trade</b>: imports of the target, trade flowing into it from the species' known range, and how strong an exporter that range is.</li>
 <li><b>Biotic</b>: the share of the species' helpful partners (food, hosts, mutualists) and harmful partners (predators, parasites, competitors) already present.</li>
 <li><b>Location</b>: properties of the target itself, such as island status, wealth and native richness.</li>
 <li><b>Spread</b>: how close the species' nearest known population is, and how many known locations lie within 1 000 km.</li>
 </ul>
-<p>The scored location is always left out of the species' own range, so the model learns to predict new records, not to recognise existing ones. Species already recorded in the location are never listed.</p>
+<p>The scored location is always left out of the species' own range, so the model learns to predict new records, not to recognise existing ones. Species already recorded in the location are never listed. Whether a climate gate scaled other streams by the climate match is a training setting; the model card above names it.</p>
+
+<h2>Native-range and GRIIS checks</h2>
+<p>Before a list is cut to its length, two checks are applied to the ranking. Species that are <b>native</b> in the location (SInAS, or an extra checklist) and species already on the <b>GRIIS checklist</b> of the location's country (the Global Register of Introduced and Invasive Species) are removed: they are not horizon species. Removed species are replaced by the next candidates and are listed under "Checks" above the filters when the checks files are loaded.</p>
+<p>Some findings are kept and <b>flagged</b> next to the species name instead: a species native elsewhere in the same country (for example on the mainland when an island group is scanned), and a GRIIS-listed species for a location that shares its country code with other locations, because GRIIS cannot say which of them is meant. Use the "Checklist flags" filter to show or hide them.</p>
 
 <h2>Feature contributions</h2>
 <p>The detail panel uses Integrated Gradients on the model's pre-sigmoid score. The baseline is an average candidate pair. Contributions add up to the difference between the species' score and the baseline score. Red bars raise the risk; blue bars lower it. They are grouped in six blocks: climate, trade, biotic, relational, spread and location. Contributions show what drives this model's score; they do not prove a cause.</p>
@@ -267,8 +289,8 @@ td.drv{font-size:13px;color:var(--mute);max-width:220px}
 <h2>How uncertainty is calculated</h2>
 <p>The ± value combines an ensemble of <span id="ens">several</span> models trained with different random seeds and Monte Carlo dropout: each model keeps its dropout layers on and scores each species <span id="mcn">30</span> times.</p>
 <ul>
-<li><b>Invasion risk</b> is the mean probability over all passes of all models.</li>
-<li><b>Uncertainty (±)</b> is the standard deviation of those probabilities, in percentage points. The charts and the maximum-uncertainty filter use it. The detail panel also shows the part that comes from disagreement between the models.</li>
+<li><b>Risk score</b> is the mean output over all passes of all models.</li>
+<li><b>Uncertainty (±)</b> is the standard deviation of those outputs, in percentage points. The charts and the maximum-uncertainty filter use it. The detail panel also shows the part that comes from disagreement between the models.</li>
 <li><b>Standard error</b> is the standard deviation divided by √passes. It is the <code>uncertainty_se</code> column of the scan file.</li>
 </ul>
 <p>This covers the model's own uncertainty, not gaps in the input data. Data support, below, covers those.</p>
@@ -276,13 +298,20 @@ td.drv{font-size:13px;color:var(--mute);max-width:220px}
 <h2>Data support and effort shift</h2>
 <p>Some species are far better documented than others, and documentation partly follows invasion: known invaders get studied. The model therefore scores every species as if it were documented like a typical known invader (GloBI records and partner counts, and whether the native range is known, are set to typical values). It also learned from negatives matched to the positives on documentation level, taxonomic group and location.</p>
 <ul>
-<li><b>Data support</b> (0–1) says how much evidence a prediction rests on. It averages three parts: the size of the known range, the number of known interaction partners (both count as full from 20 upward), and whether the native range is known. <b>Low</b> is below 0.4, <b>high</b> from 0.7. It does not change the score. A species with high risk and low support is a candidate to check, not a confident prediction.</li>
-<li><b>Effort shift</b> is the risk after the effort correction minus the risk the same model gives with the species' actual documentation, in percentage points. Negative: documentation alone would have ranked the species higher. Positive: it was held back by being poorly studied.</li>
+<li><b>Data support</b> (0–1) says how much evidence a prediction rests on. It averages three parts: the size of the known range, the number of known interaction partners (both count as full from 20 upward), and whether the native range is known. <b>Low</b> is below 0.4, <b>high</b> from 0.7. It does not change the score. A species with a high score and low support is a candidate to check, not a confident prediction.</li>
+<li><b>Effort shift</b> is the score after the effort correction minus the score the same model gives with the species' actual documentation, in percentage points. Negative: documentation alone would have ranked the species higher. Positive: it was held back by being poorly studied.</li>
 </ul>
-<p>Older scan files without these columns are still read; the columns then show “–”.</p>
+<p>Scan files without these columns are still read; the columns then show “–”.</p>
 
-<h2>EICAT impact categories</h2>
-<p>EICAT (Environmental Impact Classification for Alien Taxa) is the IUCN standard for rating how much harm an alien species has caused to native species. The category is based on documented impacts where the species is already established; it does not predict impact in the selected location. The model does not produce EICAT categories: notebook 05 adds them from an optional <code>eicat_lookup.csv</code>. Species without an assessment show NE.</p>
+<h2>Documented impact: EICAT, SEICAT and where they come from</h2>
+<p>The risk score says how likely a species is to establish. How much harm it could do is a separate question, and this viewer keeps the two apart: <b>impact data is never used by the model</b>. It is shown next to each species so that the people assessing a list can weigh it themselves.</p>
+<p>EICAT (Environmental Impact Classification for Alien Taxa) rates harm to native species; SEICAT (Socio-Economic Impact Classification of Alien Taxa) rates harm to people's activities. Both describe documented impacts where the species is already alien; they do not predict the impact in the selected location. The categories are read from <code>species_impacts_master.csv</code>, written by notebook <code>07_species_impacts.ipynb</code>. Each category names its source:</p>
+<ul>
+<li><span class="eb e-MO">MO</span> <b>GIDIAS records</b> (filled badge): the highest impact magnitude that any publication in the Global Impacts Dataset of Invasive Alien Species reports for the species, with the number of records and sources behind it. It is a summary of evidence, not an IUCN assessment: one source can set the category, and because GIDIAS does not record reversibility a local extinction is shown as Major and may be Massive.</li>
+<li><span class="eb e-MO llm">MO<small>LLM</small></span> <b>LLM-derived</b> (dashed badge): for a species GIDIAS does not cover, proposed by a language model that was asked for the same fields. It comes with the model's name, the agreement between repeated answers and a short justification. A language model can be confidently wrong and can cite sources that do not exist. Use it to decide which species to look at first.</li>
+<li><span class="eb e-NE">NE</span> <b>Not evaluated</b>: no impact data from either source.</li>
+</ul>
+<p>The EICAT and the SEICAT category of one species can come from different sources. The "EICAT source" filter shows one kind only; in the chart, LLM-derived categories are drawn as hollow symbols. If notebook 07 compared its model with GIDIAS, the agreement is shown in the model card above. List files written before notebook 07 took over carry EICAT columns of their own; those are shown when no impact file is loaded.</p>
 <div id="edef"></div>
 </section>
 </main>
@@ -302,19 +331,36 @@ hex:[[1,0],[.5,.87],[-.5,.87],[-1,0],[-.5,-.87],[.5,-.87]],plus:[[-.3,-1],[.3,-1
 x:[[-1,-.7],[-.7,-1],[0,-.3],[.7,-1],[1,-.7],[.3,0],[1,.7],[.7,1],[0,.3],[-.7,1],[-1,.7],[-.3,0]]};
 var EIC=["MC","MN","MO","MR","MV"],ECATS=EIC.concat(["DD","NE"]);
 var SUP=["low","medium","high"],SUPN=["Low","Medium","High"];
+/* Where an EICAT category comes from (eicat_source column) */
+var SRC=["gidias","llm","expert","other","none"],SRCN={gidias:"GIDIAS records",llm:"LLM-derived",expert:"Published assessment",other:"Other source",none:"Not evaluated"};
+/* Checklist flags (check_flags column): short label, explanation */
+var FLAGS={native_target:["native here","SInAS lists this species as native in the location itself."],
+native_extra:["native here (extra list)","Listed as native in the location by the extra native checklist."],
+native_same_country:["native in same country","Native in another SInAS location of the same country (for example the mainland). It may already be present, or arrive without human help."],
+griis_listed:["on GRIIS list","On the GRIIS checklist of introduced species of this location's country."],
+griis_invasive:["GRIIS: impact","GRIIS records evidence of impact for this species in this location's country."]};
 function supClass(o){var c=o.data_support_class;if(c!=null){var i=SUP.indexOf(String(c).toLowerCase());if(i>=0)return i}
   var v=o.data_support;if(v==null||isNaN(+v))return-1;return+v<.4?0:+v<.7?1:2}
 function supBadge(r){return r.sc<0?'<span class="muted">–</span>':'<span class="sp sp-'+r.sc+'" title="data support '+(r.sup!=null?(+r.sup).toFixed(2):"")+'">'+SUPN[r.sc]+"</span>"}
 function fmtShift(v){if(v==null||isNaN(v))return'<span class="muted">–</span>';var cls=v<-.0005?" dn":v>.0005?" up":"";
   return'<span class="shift'+cls+'">'+(v>0?"+":v<0?"−":"±")+Math.abs(v*100).toFixed(1)+" pp</span>"}
+function derived(r){return r.esrc==="llm"||r.esrc==="other"}
+function catBadge(cat,src,title){var d=src==="llm"||src==="other";
+  return'<span class="eb e-'+cat+(d?" llm":"")+'" title="'+esc(title)+'">'+cat+(d?"<small>"+(src==="llm"?"LLM":"?")+"</small>":"")+"</span>"}
+function eBadge(r){return catBadge(r.ei,r.esrc,"EICAT · "+SRCN[r.esrc]+(r.esrc==="llm"&&r.emodel?" ("+r.emodel+")":"")+(r.econf?", "+(r.esrc==="gidias"?"evidence ":"confidence ")+r.econf:""))}
+function sBadge(r){return r.si==="NE"?'<span class="muted">–</span>':catBadge(r.si,r.ssrc,"SEICAT · "+SRCN[r.ssrc])}
+function flagChips(r){return r.flags.map(function(f){var d=FLAGS[f]||[f.replace(/_/g," "),""];
+  return'<span class="fl" title="'+esc(d[1])+'">'+esc(d[0]+(f==="griis_listed"&&r.raw.griis_scope==="country"?" (country level)":""))+"</span>"}).join("")}
 var BLOCKS={climate:"Climate",trade:"Trade",biotic:"Biotic",relational:"Relational",spread:"Spread",location:"Location"};
 var EDEF=[["MC","Minimal concern","No known negative effect on native species at the places where it has been recorded."],
 ["MN","Minor","Lowers the fitness of individual native animals or plants, but does not reduce native population sizes."],
 ["MO","Moderate","Reduces the population size of at least one native species, but causes no local extinction and no change in community makeup."],
 ["MR","Major","Causes local extinction of at least one native species and changes community composition. The effects would reverse within about 10 years if the alien were removed."],
 ["MV","Massive","Causes the replacement or extinction of native species, with community changes that would last more than 10 years after removal."],
-["DD","Data deficient","Some impact is documented, but not enough to assign a category."],
-["NE","Not evaluated","No EICAT assessment has been made for this species."]];
+["DD","Data deficient","The species was looked at, but the evidence is not enough to assign a category."],
+["NE","Not evaluated","No impact data for this species."]];
+/* SEICAT: the same steps, for harm to people's activities */
+var SDEF={MC:["Minimal concern","No change in people's activities reported."],MN:["Minor","Activities are harder to carry out, but nobody has stopped."],MO:["Moderate","Fewer people take part in at least one activity."],MR:["Major","An activity has disappeared from all or part of the invaded area; reversible."],MV:["Massive","An activity has disappeared irreversibly."],DD:["Data deficient","Not enough evidence to assign a category."],NE:["Not evaluated","No information on impacts on people."]};
 var $=function(s){return document.querySelector(s)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function edefHTML(){return EDEF.map(function(d){return'<div class="ed"><span class="eb e-'+d[0]+'">'+d[0]+'</span><div><b>'+d[1]+'</b><br><span class="muted">'+d[2]+'</span></div></div>'}).join("")}
@@ -352,16 +398,22 @@ function cell(s){if(s===""||s==null)return null;var l=s.toLowerCase();
 function toObjects(rows){var h=rows[0].map(function(x){return x.trim()});
   return{header:h,rows:rows.slice(1).map(function(r){var o={};for(var j=0;j<h.length;j++)o[h[j]]=cell(r[j]);return o})}}
 function kindOf(h){var H=new Set(h);
+  if(H.has("gbif_id")&&H.has("impact_source")&&H.has("eicat")&&!H.has("probability"))return"impacts";
   if(H.has("block")&&H.has("value")&&H.has("gbif_id"))return"contributions";
   if(H.has("node_gbif_id")&&H.has("hop"))return"saliency nodes";
   if(H.has("src_gbif_id")&&H.has("dst_gbif_id"))return"saliency edges";
+  if(H.has("rank_before_checks")&&H.has("reason"))return"checks dropped";
+  if(H.has("dropped_from_top")&&H.has("target_country"))return"checks summary";
+  if(H.has("feature_key")&&H.has("leaf")&&!H.has("gbif_id"))return"feature dictionary";
   if(H.has("gbif_id")&&(H.has("probability")||H.has("invasion_probability")))return"scan";
   return null}
-function locFromName(fn){var m=fn.replace(/\.csv$/i,"").replace(/^(scan|contributions|gnn_saliency_nodes|gnn_saliency_edges)_/,"").replace(/_horizon_scan.*$/,"");
+var KIND_RE=/^(scan|contributions|gnn_saliency_nodes|gnn_saliency_edges|checks_dropped)_(.+)\.csv$/i;
+function locFromName(fn){var m=fn.replace(/\.csv$/i,"").replace(/^(scan|contributions|gnn_saliency_nodes|gnn_saliency_edges|checks_dropped)_/,"").replace(/_horizon_scan.*$/,"");
   return m.split("_").map(function(w){return w.charAt(0).toUpperCase()+w.slice(1)}).join(" ")}
 
 /* ---------------------------------------------------------------- store */
-var S={scan:{},contrib:{},salN:{},salE:{},card:null,files:[],example:false};
+function emptyStore(){return{scan:{},contrib:{},salN:{},salE:{},chkSum:{},chkDrop:{},pending:{},imp:null,card:null,files:[],example:false}}
+var S=emptyStore();
 function key(loc,id){return loc+"|"+id}
 var FISH=["Actinopterygii","Chondrichthyes","Elasmobranchii","Cephalaspidomorphi","Myxini","Sarcopterygii","Petromyzonti"],
 HERP=["Amphibia","Reptilia","Squamata","Testudines","Crocodylia"];
@@ -370,17 +422,35 @@ function groupOf(o){if(o.group!=null&&GKEY[o.group]!=null)return GKEY[o.group];
   if(k==="Plantae")return GKEY.plant;if(k!=="Animalia")return GKEY.fungi;
   if(FISH.indexOf(c)>=0)return GKEY.fish;if(HERP.indexOf(c)>=0)return GKEY.herp;
   if(c==="Aves")return GKEY.bird;if(c==="Mammalia")return GKEY.mammal;return GKEY.invertebrate}
+/* Source of a category. List files written before notebook 07 took over
+   carry eicat columns of their own; without eicat_source those were
+   published assessments. */
+function sourceOf(s,cat,legacy){if(cat==="NE")return"none";
+  if(s==null||s==="")return legacy?"expert":"other";s=String(s).toLowerCase();
+  return s==="gidias"||s==="llm"||s==="expert"?s:s==="none"&&legacy?"expert":"other"}
+function catOf(v){v=String(v==null?"NE":v).toUpperCase();return ECATS.indexOf(v)<0?"NE":v}
+/* Impact of a list row: from the impact file (species_impacts_master.csv)
+   when one is loaded, else from the eicat columns of an older scan file.
+   Impact is joined here, in the browser; the lists do not carry it. */
+function setImpact(r){var legacy=!S.imp,m=legacy?r.raw:(S.imp[r.id]||{});
+  r.im=m;r.ei=catOf(m.eicat!=null?m.eicat:m.eicat_category);r.es=EIC.indexOf(r.ei);r.esrc=sourceOf(m.eicat_source,r.ei,legacy);
+  r.si=catOf(m.seicat);r.ss=EIC.indexOf(r.si);r.ssrc=sourceOf(m.seicat_source,r.si,false);
+  r.econf=m.eicat_confidence!=null?String(m.eicat_confidence):"";
+  r.emodel=m.impact_model!=null?String(m.impact_model):m.eicat_model!=null?String(m.eicat_model):""}
+function relink(){Object.keys(S.scan).forEach(function(l){S.scan[l].forEach(setImpact)})}
+function ingestImpacts(rows){S.imp=S.imp||{};var n=0;
+  rows.forEach(function(o){if(o.gbif_id==null)return;S.imp[o.gbif_id]=o;n++});relink();return n}
 var ATTR_BLOCK=[["attr_climate_","climate"],["attr_koppen","climate"],["attr_trade_","trade"],["attr_biotic_","biotic"],["attr_relational_","relational"],["attr_proximity","spread"],["attr_context_","location"]];
 function ingestScan(rows,header,fallback){var touched={};
   var attrCols=header.filter(function(h){return/^attr_/.test(h)});
   rows.forEach(function(o){var loc=o.target_country!=null?String(o.target_country):fallback;if(o.gbif_id==null)return;
-    var ei=String(o.eicat||o.eicat_category||"NE").toUpperCase();if(ECATS.indexOf(ei)<0)ei="NE";
     var r={loc:loc,id:o.gbif_id,name:o.taxon_name||("GBIF "+o.gbif_id),g:groupOf(o),
       p:o.probability!=null?o.probability:o.invasion_probability,
       e:o.uncertainty!=null?o.uncertainty:(o.invasion_probability_std!=null?o.invasion_probability_std:0),
-      se:o.uncertainty_se!=null?o.uncertainty_se:o.invasion_probability_se,ei:ei,es:EIC.indexOf(ei),raw:o,
+      se:o.uncertainty_se!=null?o.uncertainty_se:o.invasion_probability_se,raw:o,
+      flags:o.check_flags!=null?String(o.check_flags).split(";").filter(Boolean):[],
       sup:o.data_support!=null?+o.data_support:null,sc:supClass(o),sh:o.effort_shift!=null?+o.effort_shift:null};
-    if(r.p==null)return;r.j=(hash(String(r.id))%1000)/1000-.5;
+    if(r.p==null)return;setImpact(r);r.j=(hash(String(r.id))%1000)/1000-.5;
     if(!touched[loc]){S.scan[loc]=[];touched[loc]=1}
     S.scan[loc].push(r);
     if(attrCols.length&&!S.contrib[key(loc,r.id)]){var items=[];
@@ -402,24 +472,54 @@ function ingestGroup(rows,store,fallback,tag){var locs={};
     var id=o.node_gbif_id!=null?o.node_type+"|"+o.node_gbif_id:o.src_type+"|"+o.src_gbif_id+">"+o.dst_type+"|"+o.dst_gbif_id;
     if(store[k].seen[id])return;store[k].seen[id]=1;store[k].push(o)});
   return Object.keys(locs)}
+/* Checks files: one summary row per location; one row per removed candidate */
+function ingestChecks(rows,kind,fallback,tag){var locs={};
+  rows.forEach(function(o){var loc=o.target_country!=null?String(o.target_country):fallback;locs[loc]=1;
+    if(kind==="checks summary"){S.chkSum[loc]=o;return}
+    if(!S.chkDrop[loc]||S.chkDrop[loc].tag!==tag){S.chkDrop[loc]=[];S.chkDrop[loc].tag=tag;S.chkDrop[loc].seen={}}
+    if(S.chkDrop[loc].seen[o.gbif_id])return;S.chkDrop[loc].seen[o.gbif_id]=1;S.chkDrop[loc].push(o)});
+  return Object.keys(locs)}
 
+/* Read one file into the store; returns its record for the file list. */
+async function readOne(f,run){var rec={name:f.name,type:null,rows:0,locs:[]};
+  try{var text=await f.text();
+    if(/\.json$/i.test(f.name)){var J=JSON.parse(text);if(!J||!(J.trained_at||J.streams))throw new Error("not a model_card.json");S.card=J;rec.type="model card";renderCard()}
+    else{var P=parseCSV(text);
+      if(P.length<2){rec.type="empty";return rec}
+      var T=toObjects(P),k=kindOf(T.header),fb=locFromName(f.name);rec.type=k;rec.rows=T.rows.length;
+      if(!k)throw new Error("columns not recognised; expected a scan, contributions, GNN saliency or checks file from notebook 05 or 06, or the impact file from notebook 07");
+      if(k==="impacts"){S.imp={};rec.rows=ingestImpacts(T.rows);rec.type="impact data";return rec}
+      if(k==="scan")rec.locs=ingestScan(T.rows,T.header,fb);
+      else if(k==="contributions")rec.locs=ingestContrib(T.rows,fb);
+      else if(k==="saliency nodes")rec.locs=ingestGroup(T.rows,S.salN,fb,run);
+      else if(k==="saliency edges")rec.locs=ingestGroup(T.rows,S.salE,fb,run);
+      else if(k==="feature dictionary")rec.rows=0;
+      else rec.locs=ingestChecks(T.rows,k,fb,run)}}
+  catch(e){rec.err=e.message||String(e)}
+  return rec}
+/* With many files (a whole exports folder) only the lists are read at
+   once; contributions and saliency files wait until their location is
+   opened. A combined *_all_locations.csv is skipped when the same batch
+   holds the per-location files of that kind. */
+var LAZY_MIN=24;
 async function loadFiles(list){
   if(!list.length)return;
   if(S.example)clearAll(true);
-  var msg=[],run=++ingestContrib.run;
-  for(var f of list){var rec={name:f.name,type:null,rows:0,locs:[]};
-    try{var text=await f.text();
-      if(/\.json$/i.test(f.name)){var J=JSON.parse(text);if(!J||!(J.trained_at||J.streams))throw new Error("not a model_card.json");S.card=J;rec.type="model card";renderCard()}
-      else{var P=parseCSV(text);if(P.length<2)throw new Error("the file has no data rows");
-        var T=toObjects(P),k=kindOf(T.header),fb=locFromName(f.name);rec.type=k;rec.rows=T.rows.length;
-        if(!k)throw new Error("columns not recognised; expected a scan, contributions or GNN saliency file from notebook 05");
-        if(k==="scan")rec.locs=ingestScan(T.rows,T.header,fb);
-        else if(k==="contributions")rec.locs=ingestContrib(T.rows,fb);
-        else if(k==="saliency nodes")rec.locs=ingestGroup(T.rows,S.salN,fb,run);
-        else rec.locs=ingestGroup(T.rows,S.salE,fb,run)}}
-    catch(e){rec.err=e.message||String(e);msg.push(f.name+": "+rec.err)}
+  var msg=[],run=++ingestContrib.run,lazy=list.length>=LAZY_MIN,hasPer={},deferred=0;
+  list.forEach(function(f){var m=KIND_RE.exec(f.name);if(m&&m[2].toLowerCase()!=="all_locations")hasPer[m[1].toLowerCase()]=1});
+  for(var f of list){var m=KIND_RE.exec(f.name),kind=m&&m[1].toLowerCase(),part=m&&m[2].toLowerCase();
+    if(m&&part==="all_locations"&&hasPer[kind])continue;
+    if(lazy&&m&&kind!=="scan"&&kind!=="checks_dropped"){(S.pending[part]=S.pending[part]||[]).push(f);deferred++;continue}
+    var rec=await readOne(f,run);if(rec.err)msg.push(f.name+": "+rec.err);
     S.files=S.files.filter(function(x){return x.name!==rec.name});S.files.push(rec)}
+  if(deferred){S.files=S.files.filter(function(x){return x.type!=="deferred"});
+    S.files.push({name:Object.keys(S.pending).reduce(function(a,k){return a+S.pending[k].length},0)+" explanation files",type:"deferred",note:"read when a location is opened",rows:0,locs:[]})}
   afterLoad(msg)}
+async function loadPending(loc){var k=slug(loc),fs=S.pending[k];if(!fs)return;delete S.pending[k];
+  var m=$("#lmsg"),was=[m.className,m.textContent],errs=[];m.className="msg";m.textContent="Reading the explanations of "+loc+"…";
+  for(var f of fs){var rec=await readOne(f,ingestContrib.run);if(rec.err)errs.push(f.name+": "+rec.err)}
+  if(errs.length){m.className="msg err";m.textContent="Could not read: "+errs.join("; ")}else{m.className=was[0];m.textContent=was[1]}
+  if(country===loc)render()}
 function afterLoad(errs){
   renderFiles();
   var locs=Object.keys(S.scan).sort(function(a,b){return a.localeCompare(b)});
@@ -429,17 +529,20 @@ function afterLoad(errs){
   var orphan=Object.keys(S.contrib).concat(Object.keys(S.salN)).some(function(k){return!S.scan[k.split("|")[0]]});
   var m=$("#lmsg");
   if(errs&&errs.length){m.className="msg err";m.textContent="Could not read: "+errs.join("; ")}
-  else{m.className="msg";m.textContent=locs.length?(locs.length+" location"+(locs.length>1?"s":"")+" loaded."+(orphan?" Some contribution or saliency rows belong to a location without a scan file.":"")):"No scan file loaded yet."}
+  else{m.className="msg";m.textContent=locs.length?(locs.length+" location"+(locs.length>1?"s":"")+" loaded."+(orphan?" Some contribution or saliency rows belong to a location without a scan file.":"")+(Object.keys(S.pending).length?" Contributions and saliency maps are read when you open a location.":"")+(S.imp?" Impact data for "+Object.keys(S.imp).length.toLocaleString("en")+" species.":S.example?"":" No impact file loaded (species_impacts_master.csv from notebook 07).")):(S.imp?"Impact data loaded; no scan file yet.":"No scan file loaded yet.")}
   $("#srcbadge").hidden=!S.example;
   $("#pick").hidden=!locs.length;$("#noload").hidden=!!locs.length;
   pickLocation()}
-function clearAll(silent){S={scan:{},contrib:{},salN:{},salE:{},card:null,files:[],example:false};
+function clearAll(silent){S=emptyStore();
   ingestContrib.run=0;closeD();renderCard();if(!silent)afterLoad([])}
 
 function renderFiles(){
   $("#files").innerHTML=S.files.length?"":'<span class="msg">none yet</span>';
-  if(S.files.length)$("#files").innerHTML=S.files.map(function(f){
-    return'<span class="file'+(f.err?" bad":"")+'"><code>'+esc(f.name)+'</code><span>'+(f.err?"not read":esc(f.type)+(f.rows?" · "+f.rows.toLocaleString("en")+" rows":"")+(f.locs&&f.locs.length?" · "+f.locs.length+" location"+(f.locs.length>1?"s":""):""))+'</span></span>'}).join("")}
+  if(!S.files.length)return;
+  var bad=S.files.filter(function(f){return f.err}),ok=S.files.filter(function(f){return!f.err}),show=bad.concat(ok).slice(0,14);
+  $("#files").innerHTML=show.map(function(f){
+    return'<span class="file'+(f.err?" bad":"")+'"><code>'+esc(f.name)+'</code><span>'+(f.err?"not read":esc(f.note||f.type)+(f.rows?" · "+f.rows.toLocaleString("en")+" rows":"")+(f.locs&&f.locs.length?" · "+f.locs.length+" location"+(f.locs.length>1?"s":""):""))+'</span></span>'}).join("")
+    +(S.files.length>show.length?'<span class="msg">and '+(S.files.length-show.length).toLocaleString("en")+" more</span>":"")}
 
 var drop=$("#drop");
 $("#fin").onchange=function(){loadFiles(Array.from(this.files));this.value=""};
@@ -450,8 +553,8 @@ $("#clr").onclick=function(){clearAll(false)};
 $("#exbtn").onclick=function(){loadExample()};
 $("#pickf").onclick=function(){$("#fin").click()};
 $("#pickd").onclick=function(){$("#fdir").click()};
-$("#fdir").onchange=function(){var fs=Array.from(this.files).filter(function(f){return/\.(csv|json)$/i.test(f.name)&&!/^cv_results/i.test(f.name)});this.value="";
-  if(!fs.length){$("#lmsg").className="msg err";$("#lmsg").textContent="That folder has no model outputs (.csv files or model_card.json). Choose the model_outputs/exports folder written by notebook 05.";return}loadFiles(fs)};
+$("#fdir").onchange=function(){var fs=Array.from(this.files).filter(function(f){return/\.(csv|json)$/i.test(f.name)&&!/^(cv_results|eicat_llm|impact_llm|impacts_summary)/i.test(f.name)});this.value="";
+  if(!fs.length){$("#lmsg").className="msg err";$("#lmsg").textContent="That folder has no model outputs (.csv files or model_card.json). Choose the model_outputs/exports folder written by notebooks 05 to 07.";return}loadFiles(fs)};
 
 /* --------------------------------------------------------- example data */
 var PRE=["Ana","Bor","Cal","Del","Eri","Fal","Gor","Hel","Ili","Jur","Kal","Lum","Mar","Nor","Oph","Pel","Rho","Sal","Tor","Ver","Xan","Zyg"],MID=["a","e","i","o","u","ia","ella","ina","ora"],END=["us","a","ia","ium","is","ops","ax","ella"],EP=["ferox","lata","minor","vagans","robusta","rapax","tenuis","communis","pallida","major","nitida","glabra"];
@@ -470,14 +573,14 @@ function exampleFeatures(){var F=[];
   F.push(["biotic","helpful partners present",.5],["biotic","harmful partners present",.35],["biotic","has known helpful partners",.15],["biotic","has known harmful partners",.1],["biotic","number of helpful partners",.15],["biotic","number of harmful partners",.1]);
   F.push(["relational","species graph embedding",.8],["relational","location latent profile",.3]);return F}
 function loadExample(){
-  clearAll(true);S.example=true;var FEATS=exampleFeatures(),GW=[.34,.3,.07,.06,.07,.05,.11];
+  clearAll(true);S.example=true;var FEATS=exampleFeatures(),GW=[.34,.3,.07,.06,.07,.05,.11],IM=[];
   [["Belgium",420],["Hawaii",360],["New Zealand",390]].forEach(function(L){
-    var loc=L[0],R=rng(hash(loc)),bias=GW.map(function(){return R()*1.2-.6}),rows=[],cRows=[],nRows=[],eRows=[];
+    var loc=L[0],R=rng(hash(loc)),bias=GW.map(function(){return R()*1.2-.6}),rows=[],cRows=[],nRows=[],eRows=[],sub=loc==="Hawaii";
     for(var i=0;i<L[1];i++){var u=R(),g=0,a=GW[0];while(u>a&&g<6){g++;a+=GW[g]}
       var gk=GROUPS[g].k,gen=genus(R),p=sig(-3.0+1.35*gauss(R)+bias[g]),e=Math.min(.35,(.015+.2*Math.sqrt(p*(1-p))*(.5+R()))*(g==6||g==1?1.3:1)),ei="NE",r=R();
       if(r<.07)ei="DD";else if(r>=.55)ei=EIC[Math.max(0,Math.min(4,Math.round(p*3.6+gauss(R)*.8)))];
       rows.push({gbif_id:1000000+i*13+g+hash(loc)%997*100000,taxon_name:gen+" "+choose(R,EP),group:gk,kingdom:KING[gk][0],"class":KING[gk][1],family:gen.slice(0,4)+"idae",target_country:loc,
-        probability:p,uncertainty:e,uncertainty_se:e/Math.sqrt(30),eicat:ei,n_alien_locations:1+Math.floor(R()*40),
+        probability:p,uncertainty:e,uncertainty_se:e/Math.sqrt(30),n_alien_locations:1+Math.floor(R()*40),
         feat_mahalanobis_distance:Math.abs(gauss(R))*2+.3,feat_koppen_overlap:R(),feat_nearest_range_km:R()<.08?Infinity:Math.round(R()*R()*6000),
         feat_n_range_locations:1+Math.floor(R()*60),feat_biotic_opp_positive:R(),feat_biotic_opp_negative:R()*.6});
       var o=rows[rows.length-1];o.feat_n_range_locations=Math.max(o.feat_n_range_locations,o.n_alien_locations);var nr=o.feat_n_range_locations,np=R()<.35?0:Math.floor(Math.exp(R()*4.5)),nat=R()>.3,sat=Math.log(21);
@@ -485,7 +588,19 @@ function loadExample(){
       o.data_support=+((Math.min(1,Math.log(1+nr)/sat)+Math.min(1,Math.log(1+np)/sat)+(nat?1:0))/3).toFixed(3);
       o.data_support_class=SUP[o.data_support<.4?0:o.data_support<.7?1:2];o.gbif_fetch_failed=R()<.02;
       o.score_deterministic=p;o.score_effort_raw=sig(logit(p)+(Math.log(1+np)/4.5-.35)*.6+gauss(R)*.08);o.effort_shift=p-o.score_effort_raw;
-      o.uncertainty_ensemble=e*(.3+.3*R())}
+      o.uncertainty_ensemble=e*(.3+.3*R());
+      /* impact data, as in species_impacts_master.csv: GIDIAS for most species, a language model for the rest */
+      var rs=R(),rc=R();if(ei!=="NE"){var isrc=rs<.35?"llm":"gidias",rated=ei!=="DD",sei=rc<.55?"":EIC[Math.floor(rc*40)%4],nrec=1+Math.floor(R()*30);
+        IM.push({gbif_id:o.gbif_id,taxon_name:o.taxon_name,impact_source:isrc,eicat:ei,eicat_source:isrc,eicat_confidence:rated?["low","medium","high"][Math.floor(rc*3)]:"",
+          eicat_mechanism:rated?choose(R,["competition","predation","grazing/herbivory/browsing","transmission of disease"]):"",affected_native_taxa:rated?choose(R,["Plant","Invertebrate","Vertebrate"]):"",
+          eicat_n_records:isrc==="gidias"&&rated?nrec:null,eicat_n_sources:isrc==="gidias"&&rated?Math.ceil(nrec/3):null,eicat_agreement:isrc==="llm"?(rc<.3?.67:1):null,
+          eicat_countries:rated&&isrc==="gidias"?"Exampleland":"",eicat_justification:rated?"Reported to reduce native populations in part of its alien range (example text, not real).":"No impact evidence that can be rated (example text).",
+          seicat:sei,seicat_source:sei?isrc:"none",seicat_constituents:sei?"Material and immaterial assets":"",seicat_justification:sei?"Example text, not real.":"",
+          impact_realms:choose(R,["Terrestrial","Freshwater","Marine"]),impact_countries:"Exampleland; Samplestan",impact_n_countries:2,positive_nature:rs>.9,positive_people:rc>.85,
+          ncp_categories:sei?"Food and feed":"",impact_n_records:isrc==="gidias"?nrec+3:null,impact_n_sources:isrc==="gidias"?Math.ceil(nrec/3)+1:null,
+          impact_model:isrc==="llm"?"example-model":null,impact_n_runs:isrc==="llm"?3:null})}
+      /* checklist flags: mostly for the sub-national example location */
+      var rf=R();o.griis_scope=sub?"country":"location";o.check_flags=sub?(rf<.06?"native_same_country":rf<.11?"griis_listed":rf<.13?"griis_listed;griis_invasive":""):(rf<.02?"native_same_country":"")}
     rows.sort(function(x,y){return y.probability-x.probability});
     rows.forEach(function(o,i){var rr=rng(hash(loc+o.gbif_id));
       if(i<80){var base=.08,t=logit(o.probability)-logit(base),raw=FEATS.map(function(f){return gauss(rr)*f[2]}),m=raw.reduce(function(s,v){return s+v},0);
@@ -494,7 +609,13 @@ function loadExample(){
           if(!best||v>best[1])best=[f[1],v];if(!worst||v<worst[1])worst=[f[1],v]});
         o.top_driver=best[0];o.top_suppressor=worst[0]}
       if(i<20)exampleSaliency(o,loc,rr,nRows,eRows)});
-    ingestScan(rows,Object.keys(rows[0]),loc);ingestContrib(cRows,loc);ingestGroup(nRows,S.salN,loc,0);ingestGroup(eRows,S.salE,loc,0)});
+    ingestScan(rows,Object.keys(rows[0]),loc);ingestContrib(cRows,loc);ingestGroup(nRows,S.salN,loc,0);ingestGroup(eRows,S.salE,loc,0);
+    /* what the checks removed (made up, like the rest of the example) */
+    var RD=rng(hash(loc+"checks")),nd=sub?0:4,dr=[];
+    for(var d=0;d<nd;d++)dr.push({target_country:loc,gbif_id:9000000+d,taxon_name:genus(RD)+" "+choose(RD,EP),rank_before_checks:3+d*17,score_deterministic:.8-.1*d,reason:d%2?"native in the location (extra checklist)":"on the GRIIS checklist of the location",griis_invasive:d%2===0});
+    ingestChecks(dr,"checks dropped",loc,0);
+    ingestChecks([{target_country:loc,griis_scope:sub?"country":"location",candidates:L[1]+nd,dropped_from_top:nd,dropped_native:Math.floor(nd/2),dropped_griis:nd-Math.floor(nd/2),flagged_in_list:rows.filter(function(o){return o.check_flags}).length}],"checks summary",loc,0)});
+  ingestImpacts(IM);
   S.files=[{name:"example data (3 locations)",type:"generated",rows:0,locs:[]}];
   afterLoad([])}
 function exampleSaliency(o,loc,R,nRows,eRows){
@@ -518,10 +639,11 @@ function exampleSaliency(o,loc,R,nRows,eRows){
 
 /* -------------------------------------------------------- list controls */
 function symSVG(g,s){var G=GROUPS[g],i=SH[G.s];return'<svg width="'+s+'" height="'+s+'" viewBox="-1.2 -1.2 2.4 2.4" aria-hidden="true">'+(i?'<polygon points="'+i.map(function(q){return q.join(",")}).join(" ")+'"':'<circle r="1"')+' fill="'+G.c+'"/></svg>'}
-function drawSym(x,g,cx,cy,r){var G=GROUPS[g],i=SH[G.s];x.fillStyle=G.c;x.beginPath();
-  if(!i)x.arc(cx,cy,r,0,6.2832);else i.forEach(function(q,k){k?x.lineTo(cx+q[0]*r,cy+q[1]*r):x.moveTo(cx+q[0]*r,cy+q[1]*r)});x.closePath();x.fill()}
+function drawSym(x,g,cx,cy,r,hollow){var G=GROUPS[g],i=SH[G.s];x.beginPath();
+  if(!i)x.arc(cx,cy,r,0,6.2832);else i.forEach(function(q,k){k?x.lineTo(cx+q[0]*r,cy+q[1]*r):x.moveTo(cx+q[0]*r,cy+q[1]*r)});x.closePath();
+  if(hollow){x.strokeStyle=G.c;x.lineWidth=1.5;x.stroke()}else{x.fillStyle=G.c;x.fill()}}
 
-var all=[],view=[],shown=25,country="",fg=new Set(GROUPS.map(function(_,i){return i})),fe=new Set(ECATS),fs=new Set([-1,0,1,2]),query="";
+var all=[],view=[],shown=25,country="",fg=new Set(GROUPS.map(function(_,i){return i})),fe=new Set(ECATS),fs=new Set([-1,0,1,2]),fsrc=new Set(SRC),fse=new Set(ECATS),ffl=new Set([0,1]),query="";
 var nIn=$("#n"),nR=$("#nr"),NMAX=1;
 function setN(v){v=Math.max(1,Math.min(NMAX,Math.round(v)||1));nIn.value=v;nR.value=NMAX>1?Math.round(Math.log10(v)/Math.log10(NMAX)*1000):1000}
 nIn.oninput=function(){setN(nIn.value);takeN()};
@@ -533,41 +655,72 @@ function pickLocation(){country=$("#country").value;var rows=S.scan[country]||[]
   setN(Math.min(500,NMAX));
   var emax=Math.max(1,Math.ceil(Math.max.apply(null,rows.map(function(r){return r.e||0}))*100));
   $("#fe").max=emax;$("#fe").value=emax;$("#feo").textContent=emax+"%";
-  chips();takeN()}
+  chips();renderChecks();takeN();loadPending(country)}
 function takeN(){all=(S.scan[country]||[]).slice(0,+nIn.value);apply()}
+function chipRow(sel,items,set,label,title){var el=$(sel);el.innerHTML="";
+  items.forEach(function(k){var b=document.createElement("button");b.type="button";b.className="chip";b.setAttribute("aria-pressed",set.has(k));
+    b.textContent=label(k);if(title)b.title=title(k);
+    b.onclick=function(){set.has(k)?set.delete(k):set.add(k);b.setAttribute("aria-pressed",set.has(k));apply()};el.appendChild(b)})}
 function chips(){var rows=S.scan[country]||[],present=new Set(rows.map(function(r){return r.g}));
   $("#gchips").innerHTML="";
   GROUPS.forEach(function(g,i){if(!present.has(i))return;var b=document.createElement("button");b.type="button";b.className="chip";b.setAttribute("aria-pressed",fg.has(i));b.innerHTML=symSVG(i,12)+g.n;
     b.onclick=function(){fg.has(i)?fg.delete(i):fg.add(i);b.setAttribute("aria-pressed",fg.has(i));apply()};$("#gchips").appendChild(b)});
-  var sp=new Set(rows.map(function(r){return r.sc}));$("#schips").innerHTML="";
-  [0,1,2,-1].forEach(function(i){if(!sp.has(i))return;var b=document.createElement("button");b.type="button";b.className="chip";b.setAttribute("aria-pressed",fs.has(i));
-    b.textContent=i<0?"Not in file":SUPN[i];b.title=i<0?"Scan file without data-support columns":["Below 0.4: little evidence","0.4 to 0.7","0.7 or more: well documented"][i];
-    b.onclick=function(){fs.has(i)?fs.delete(i):fs.add(i);b.setAttribute("aria-pressed",fs.has(i));apply()};$("#schips").appendChild(b)})}
+  var sp=new Set(rows.map(function(r){return r.sc}));
+  chipRow("#schips",[0,1,2,-1].filter(function(i){return sp.has(i)}),fs,function(i){return i<0?"Not in file":SUPN[i]},
+    function(i){return i<0?"Scan file without data-support columns":["Below 0.4: little evidence","0.4 to 0.7","0.7 or more: well documented"][i]});
+  /* EICAT source: shown once a list holds categories */
+  var es=new Set(rows.map(function(r){return r.esrc}));$("#srow").hidden=!(es.has("gidias")||es.has("llm")||es.has("other"));
+  chipRow("#srcchips",SRC.filter(function(k){return es.has(k)}),fsrc,function(k){return SRCN[k]},
+    function(k){return{gidias:"Highest magnitude reported in GIDIAS impact records; not an IUCN assessment",llm:"Proposed by a language model (notebook 07); not an assessment",expert:"Published EICAT assessment (from an older list file)",other:"Source named in the file",none:"No impact data (NE)"}[k]});
+  /* SEICAT category: shown once a list holds one */
+  var ss=new Set(rows.map(function(r){return r.si}));$("#serow").hidden=!ECATS.some(function(k){return k!=="NE"&&ss.has(k)});
+  chipRow("#sechips",ECATS.filter(function(k){return ss.has(k)}),fse,function(k){return k},function(k){return SDEF[k][0]+": "+SDEF[k][1]});
+  /* checklist flags: shown once a list holds flagged species */
+  $("#frow").hidden=!rows.some(function(r){return r.flags.length});
+  chipRow("#fchips",[0,1],ffl,function(k){return k?"Flagged":"No flag"},
+    function(k){return k?"Native in the same country, or on the GRIIS checklist at country level":"No finding of the native-range and GRIIS checks"})}
 ECATS.forEach(function(k){var b=document.createElement("button");b.type="button";b.className="chip";b.setAttribute("aria-pressed","true");b.textContent=k;b.title=EDEF.find(function(d){return d[0]==k})[1];
   b.onclick=function(){fe.has(k)?fe.delete(k):fe.add(k);b.setAttribute("aria-pressed",fe.has(k));apply()};$("#echips").appendChild(b)});
 $("#fp").oninput=function(){$("#fpo").textContent=this.value+"%";apply()};
 $("#fe").oninput=function(){$("#feo").textContent=this.value+"%";apply()};
 $("#q").oninput=function(){query=this.value.trim().toLowerCase();apply()};
 
-var sk="rank",sd=1,COLS=[["rank","#",1],["name","Species",1],["g","Group",1],["p","Invasion risk",-1],["e","Uncertainty (±)",-1],["sc","Data support",1],["sh","Effort shift",1],["es","EICAT",-1],["drv","Top driver",1]];
+/* What the native-range and GRIIS checks removed from this location's list */
+function renderChecks(){var el=$("#chk"),s=S.chkSum[country],d=S.chkDrop[country]||[];
+  el.hidden=!(s||d.length);if(el.hidden)return;
+  var n=s&&s.dropped_from_top!=null?+s.dropped_from_top:d.length,h="<b>Checks.</b> ";
+  h+=n?"The native-range and GRIIS checks removed "+n.toLocaleString("en")+" candidate"+(n>1?"s":"")+" from this list"
+      +(s&&s.dropped_native!=null?" ("+(+s.dropped_native)+" native, "+(+s.dropped_griis||0)+" on the GRIIS checklist)":"")+"; the next candidates took their places."
+     :"The native-range and GRIIS checks removed no candidate from this list.";
+  if(s&&s.flagged_in_list)h+=" "+(+s.flagged_in_list).toLocaleString("en")+" listed species carry a flag.";
+  if(s&&s.griis_scope==="country")h+=' <span class="muted">This location shares its country code with other locations, so GRIIS-listed species are flagged here, not removed.</span>';
+  if(d.length)h+="<details><summary>Show the "+d.length+" removed species</summary><div class=\"tw\"><table><thead><tr><th>Species</th><th>Rank before checks</th><th>Reason</th></tr></thead><tbody>"
+    +d.slice().sort(function(a,b){return(a.rank_before_checks||0)-(b.rank_before_checks||0)}).map(function(o){return"<tr><td><i>"+esc(o.taxon_name||("GBIF "+o.gbif_id))+"</i></td><td>"+esc(o.rank_before_checks)+"</td><td>"+esc(o.reason)+(o.griis_invasive===true?' <span class="fl">GRIIS: impact</span>':"")+"</td></tr>"}).join("")
+    +"</tbody></table></div></details>";
+  else if(n)h+=' <span class="muted">Load <code>checks_dropped_'+esc(slug(country))+'.csv</code> to see which.</span>';
+  el.innerHTML=h}
+
+var sk="rank",sd=1,COLS=[["rank","#",1],["name","Species",1],["g","Group",1],["p","Risk score",-1],["e","Uncertainty (±)",-1],["sc","Data support",1],["sh","Effort shift",1],["es","EICAT",-1],["ss","SEICAT",-1],["drv","Top driver",1]];
 var SKEY={rank:function(r){return r.rank},name:function(r){return r.name},g:function(r){return GROUPS[r.g].n},p:function(r){return r.p},e:function(r){return r.e},
-  es:function(r){return r.ei=="NE"?-2:r.ei=="DD"?-1:r.es},sc:function(r){return r.sc<0?9:r.sc+(r.sup||0)*.01},sh:function(r){return r.sh==null?9:r.sh},drv:function(r){return r.raw.top_driver||"~"}};
+  es:function(r){return r.ei=="NE"?-2:r.ei=="DD"?-1:r.es},ss:function(r){return r.si=="NE"?-2:r.si=="DD"?-1:r.ss},sc:function(r){return r.sc<0?9:r.sc+(r.sup||0)*.01},sh:function(r){return r.sh==null?9:r.sh},drv:function(r){return r.raw.top_driver||"~"}};
 function sortView(){var f=SKEY[sk];view.sort(function(a,b){var x=f(a),y=f(b),c=typeof x=="string"?x.localeCompare(y):x-y;return(c||a.rank-b.rank)*(c?sd:1)})}
 function hdr(){$("#hd").innerHTML=COLS.map(function(c){var on=c[0]==sk;return'<th'+(on?' aria-sort="'+(sd>0?"ascending":"descending")+'"':"")+'><button class="sb" type="button" data-k="'+c[0]+'">'+c[1]+' <span>'+(on?(sd>0?"▲":"▼"):"")+'</span></button></th>'}).join("")}
 $("#hd").onclick=function(e){var b=e.target.closest("button");if(!b)return;var k=b.dataset.k;if(k==sk)sd=-sd;else{sk=k;sd=COLS.find(function(c){return c[0]==k})[2]}hdr();sortView();render()};
 function matches(r){if(!query)return true;var o=r.raw;return(r.name+" "+(o.family||"")+" "+(o.order||"")+" "+(o["class"]||"")).toLowerCase().indexOf(query)>=0}
 function apply(){var mp=$("#fp").value/100,me=$("#fe").value/100;
-  view=all.filter(function(r){return r.p>=mp&&(r.e||0)<=me+1e-9&&fg.has(r.g)&&fe.has(r.ei)&&fs.has(r.sc)&&matches(r)});sortView();shown=25;render()}
+  view=all.filter(function(r){return r.p>=mp&&(r.e||0)<=me+1e-9&&fg.has(r.g)&&fe.has(r.ei)&&fse.has(r.si)&&fs.has(r.sc)&&fsrc.has(r.esrc)&&ffl.has(r.flags.length?1:0)&&matches(r)});sortView();shown=25;render()}
 hdr();
 function render(){
   var n=view.length,mean=function(k){return n?view.reduce(function(a,r){return a+(r[k]||0)},0)/n:0};
   $("#s-n").textContent=n.toLocaleString("en")+(n<all.length?" of "+all.length.toLocaleString("en"):"");
   $("#s-p").textContent=n?pc(mean("p")):"–";$("#s-e").textContent=n?"± "+pc(mean("e")):"–";
-  $("#s-h").textContent=view.filter(function(r){return r.es>=3}).length.toLocaleString("en");
+  var high=view.filter(function(r){return r.es>=3}),highD=high.filter(derived).length;
+  $("#s-h").textContent=high.length.toLocaleString("en");
+  $("#s-hl").textContent="EICAT Major or Massive"+(highD?" ("+highD.toLocaleString("en")+" LLM-derived)":"");
   var hasSup=view.some(function(r){return r.sc>=0});$("#s-l").textContent=hasSup?view.filter(function(r){return r.sc===0}).length.toLocaleString("en"):"–";
   var nc=view.filter(function(r){return S.contrib[key(r.loc,r.id)]}).length,ns=view.filter(function(r){return S.salN[key(r.loc,r.id)]}).length;
   $("#s-x").textContent=nc.toLocaleString("en")+" / "+ns.toLocaleString("en");
-  $("#tb").innerHTML=view.slice(0,shown).map(function(r,i){return'<tr tabindex="0" data-i="'+i+'"><td>'+r.rank+'</td><td><i>'+esc(r.name)+'</i></td><td>'+symSVG(r.g,14)+GROUPS[r.g].n+'</td><td><span class="rb"><span style="width:'+(r.p*100).toFixed(1)+'%"></span></span>'+pc(r.p)+'</td><td>± '+pc(r.e)+'</td><td>'+supBadge(r)+'</td><td>'+fmtShift(r.sh)+'</td><td><span class="eb e-'+r.ei+'">'+r.ei+'</span></td><td class="drv">'+esc(r.raw.top_driver||"–")+'</td></tr>'}).join("");
+  $("#tb").innerHTML=view.slice(0,shown).map(function(r,i){return'<tr tabindex="0" data-i="'+i+'"><td>'+r.rank+'</td><td><i>'+esc(r.name)+'</i>'+flagChips(r)+'</td><td>'+symSVG(r.g,14)+GROUPS[r.g].n+'</td><td><span class="rb"><span style="width:'+(r.p*100).toFixed(1)+'%"></span></span>'+pc(r.p)+'</td><td>± '+pc(r.e)+'</td><td>'+supBadge(r)+'</td><td>'+fmtShift(r.sh)+'</td><td>'+eBadge(r)+'</td><td>'+sBadge(r)+'</td><td class="drv">'+esc(r.raw.top_driver||"–")+'</td></tr>'}).join("");
   $("#empty").hidden=n>0;$("#more").hidden=shown>=n;draw()}
 $("#more").onclick=function(){shown+=25;render()};
 $("#tb").onclick=function(e){var tr=e.target.closest("tr");if(tr)openD(view[tr.dataset.i])};
@@ -581,21 +734,22 @@ function plot(cv,pts,o){var d=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHe
   o.xt.forEach(function(t){x.beginPath();x.moveTo(X(t[0]),m.t);x.lineTo(X(t[0]),m.t+ph);x.stroke();x.textAlign="center";x.fillText(t[1],X(t[0]),m.t+ph+15)});
   o.yt.forEach(function(t){x.beginPath();x.moveTo(m.l,Y(t[0]));x.lineTo(m.l+pw,Y(t[0]));x.stroke();x.textAlign="right";x.fillText(t[1],m.l-6,Y(t[0])+4)});
   x.textAlign="center";x.fillText(o.xl,m.l+pw/2,h-4);x.save();x.translate(11,m.t+ph/2);x.rotate(-1.5708);x.fillText(o.yl,0,0);x.restore();
-  cv._hit=[];x.globalAlpha=.7;pts.forEach(function(r){var px=X(o.fx(r)),py=Y(o.fy(r));cv._hit.push([px,py,r]);drawSym(x,r.g,px,py,3.6)});x.globalAlpha=1;
+  cv._hit=[];x.globalAlpha=.7;pts.forEach(function(r){var px=X(o.fx(r)),py=Y(o.fy(r));cv._hit.push([px,py,r]);drawSym(x,r.g,px,py,3.6,o.hollow?o.hollow(r):false)});x.globalAlpha=1;
   var h2=cv._hit.find(function(q){return q[2]===picked});if(h2){x.strokeStyle=css("--ink");x.lineWidth=2;x.beginPath();x.arc(h2[0],h2[1],8,0,6.2832);x.stroke()}}
 function sample(a,k){if(a.length<=k)return a;var s=a.length/k,o=[];for(var i=0;i<k;i++)o.push(a[Math.floor(i*s)]);return o}
 function draw(){if($("#results").hidden||$("#p-scan").hidden)return;hideTips();if(picked&&view.indexOf(picked)<0)picked=null;var v=sample(view,2500);if(picked&&v.indexOf(picked)<0)v.push(picked);
   var emax=Math.max(.05,Math.ceil(Math.max.apply(null,view.map(function(r){return r.e||0}).concat([0]))*20)/20);
   var pt=[0,.25,.5,.75,1].map(function(t){return[t,Math.round(t*100)+"%"]});
-  plot($("#c1"),v,{x0:0,x1:1,y0:0,y1:emax,xt:pt,yt:[0,.25,.5,.75,1].map(function(t){return[t*emax,"±"+Math.round(t*emax*100)+"%"]}),xl:"Invasion risk",yl:"Uncertainty (SD)",fx:function(r){return r.p},fy:function(r){return r.e||0}});
+  plot($("#c1"),v,{x0:0,x1:1,y0:0,y1:emax,xt:pt,yt:[0,.25,.5,.75,1].map(function(t){return[t*emax,"±"+Math.round(t*emax*100)+"%"]}),xl:"Risk score",yl:"Uncertainty (SD)",fx:function(r){return r.p},fy:function(r){return r.e||0}});
   $("#n1").textContent="Showing "+v.length.toLocaleString("en")+" of "+view.length.toLocaleString("en")+" species. Select a point to see its name.";
   var ev=view.filter(function(r){return r.es>=0});
   $("#c2").hidden=!ev.length;$("#c2e").hidden=!!ev.length;
-  if(!ev.length){$("#c2e").textContent="No species in this list has an EICAT category. Add eicat_lookup.csv in notebook 05 to show them.";$("#n2").textContent="";return}
+  if(!ev.length){$("#c2e").textContent="No species in this list has an EICAT category. Import species_impacts_master.csv, the impact file that notebook 07 writes.";$("#n2").textContent="";return}
   var ev2=sample(ev,2500);if(picked&&picked.es>=0&&ev2.indexOf(picked)<0)ev2.push(picked);
   var x0=Math.floor(Math.min.apply(null,ev.map(function(r){return r.p}))*20)/20,x1=Math.min(1,Math.ceil(Math.max.apply(null,ev.map(function(r){return r.p}))*20)/20);if(x1<=x0)x1=x0+.05;
-  plot($("#c2"),ev2,{x0:x0,x1:x1,y0:-.6,y1:4.6,xt:[0,.25,.5,.75,1].map(function(t){var q=x0+t*(x1-x0);return[q,Math.round(q*100)+"%"]}),yt:EIC.map(function(k,i){return[i,k]}),xl:"Invasion risk",yl:"EICAT category",fx:function(r){return r.p},fy:function(r){return r.es+r.j*.7}});
-  $("#n2").textContent="Only species with an EICAT assessment: "+ev.length.toLocaleString("en")+" of "+view.length.toLocaleString("en")+". Points are jittered vertically."}
+  plot($("#c2"),ev2,{x0:x0,x1:x1,y0:-.6,y1:4.6,xt:[0,.25,.5,.75,1].map(function(t){var q=x0+t*(x1-x0);return[q,Math.round(q*100)+"%"]}),yt:EIC.map(function(k,i){return[i,k]}),xl:"Risk score",yl:"EICAT category",fx:function(r){return r.p},fy:function(r){return r.es+r.j*.7},hollow:derived});
+  var nd=ev.filter(derived).length;
+  $("#n2").textContent="Only species with an EICAT category: "+ev.length.toLocaleString("en")+" of "+view.length.toLocaleString("en")+". Points are jittered vertically."+(nd?" Hollow symbols ("+nd.toLocaleString("en")+"): LLM-derived.":"")}
 function hideTips(){$("#tip1").hidden=true;$("#tip2").hidden=true}
 function hitAt(cv,e){var b=cv.getBoundingClientRect(),mx=e.clientX-b.left,my=e.clientY-b.top,best=null,bd=100;
   (cv._hit||[]).forEach(function(q){var d=(q[0]-mx)*(q[0]-mx)+(q[1]-my)*(q[1]-my);if(d<bd){bd=d;best=q}});return best}
@@ -603,7 +757,7 @@ function hitAt(cv,e){var b=cv.getBoundingClientRect(),mx=e.clientX-b.left,my=e.c
   cv.onmousemove=function(e){cv.style.cursor=hitAt(cv,e)?"pointer":"default"};
   cv.onclick=function(e){var h=hitAt(cv,e);if(!h){picked=null;hideTips();draw();return}
     picked=h[2];var r=picked;draw();var q=cv._hit.find(function(z){return z[2]===r})||h;tp.hidden=false;
-    tp.innerHTML='<i>'+esc(r.name)+'</i><br>'+symSVG(r.g,12)+GROUPS[r.g].n+'<br>Risk '+pc(r.p)+' ± '+pc(r.e)+' · EICAT '+r.ei+(r.sc>=0?'<br>Data support: '+SUPN[r.sc]:"")+'<br><button type="button">Show details</button>';
+    tp.innerHTML='<i>'+esc(r.name)+'</i><br>'+symSVG(r.g,12)+GROUPS[r.g].n+'<br>Score '+pc(r.p)+' ± '+pc(r.e)+' · EICAT '+r.ei+(derived(r)?" ("+esc(SRCN[r.esrc])+")":"")+(r.si!=="NE"?' · SEICAT '+r.si:"")+(r.sc>=0?'<br>Data support: '+SUPN[r.sc]:"")+'<br><button type="button">Show details</button>';
     tp.querySelector("button").onclick=function(){openD(r)};
     var w=cv.clientWidth;tp.style.left=Math.max(0,Math.min(q[0]+12,w-tp.offsetWidth))+"px";tp.style.top=Math.max(0,Math.min(q[1]+12,cv.clientHeight-tp.offsetHeight))+"px"}});
 addEventListener("resize",draw);matchMedia("(prefers-color-scheme:dark)").addEventListener("change",function(){setTimeout(draw,50)});
@@ -622,8 +776,56 @@ function factsHTML(r){var o=r.raw,F=[
   ["Harmful partners present",o.feat_biotic_opp_negative!=null?pc(o.feat_biotic_opp_negative):null],
   ["Standard error",r.se!=null?"± "+pc(r.se):null]].filter(function(f){return f[1]!=null});
   return F.length?'<h4>Key facts</h4><dl class="facts">'+F.map(function(f){return"<dt>"+f[0]+"</dt><dd>"+esc(f[1])+"</dd>"}).join("")+"</dl>":""}
+/* Checklist flags of the species, spelled out */
+function flagsHTML(r){if(!r.flags.length)return"";
+  return r.flags.map(function(f){var d=FLAGS[f]||[f.replace(/_/g," "),""];
+    return'<p class="note"><b>'+esc(d[0].charAt(0).toUpperCase()+d[0].slice(1))+".</b> "+esc(d[1])+(f==="griis_listed"&&r.raw.griis_scope==="country"?" GRIIS lists species per country and this location shares its country code with others, so the record may concern another part of the country.":"")+"</p>"}).join("")}
+/* Documented impact of the species elsewhere: EICAT and SEICAT with their
+   source and evidence, then where and what else. Never part of the score. */
+function listOf(v){return v==null||v===""?[]:String(v).split(/\s*;\s*/).filter(Boolean)}
+function yes(v){return v===true||String(v).toLowerCase()==="true"}
+function factList(F){F=F.filter(function(f){return f[1]!=null&&f[1]!==""});
+  return F.length?'<dl class="facts">'+F.map(function(f){return"<dt>"+f[0]+"</dt><dd>"+esc(f[1])+"</dd>"}).join("")+"</dl>":""}
+function refsHTML(v,llm){var a=v==null?[]:String(v).split(/\s*\|\s*/).filter(Boolean);if(!a.length)return"";
+  return'<p class="refs">'+(llm?"Sources named by the model (unchecked): ":"Sources: ")+a.map(function(x){
+    return!llm&&/^10\.\d{4,9}\/\S+$/.test(x)?'<a href="https://doi.org/'+encodeURI(x)+'" target="_blank" rel="noopener">'+esc(x)+"</a>":esc(x)}).join(" · ")+"</p>"}
+function evidenceOf(src,nrec,nsrc,agree,runs){
+  if(src==="gidias"&&nrec!=null)return(+nrec).toLocaleString("en")+" record"+(+nrec===1?"":"s")+" from "+(+nsrc||0).toLocaleString("en")+" source"+(+nsrc===1?"":"s");
+  if(src==="llm"&&agree!=null)return Math.round(+agree*100)+"% of "+(runs!=null?+runs+" ":"")+"answers agree";
+  return null}
+function impactHTML(r){var m=r.im||{},h="<h4>Documented impact elsewhere</h4>";
+  if(!S.imp&&r.ei==="NE")return h+'<p class="muted" style="font-size:13px">No impact data loaded. Import <code>species_impacts_master.csv</code> (written by notebook 07) to see EICAT and SEICAT categories with their evidence.</p>';
+  h+='<p class="cnote" style="margin:0">What the species is documented to have done where it is already alien. Information for your assessment: it does not enter the risk score and does not predict the impact here.</p>';
+  if(r.ei==="NE"&&r.si==="NE")return h+'<p class="ih">'+eBadge(r)+' <b>Not evaluated</b></p><p class="cnote">Not in GIDIAS, and not scored by the language model.</p>';
+  var ed=EDEF.find(function(x){return x[0]===r.ei}),runs=m.impact_n_runs;
+  h+='<p class="ih">'+eBadge(r)+" <b>EICAT · "+esc(ed[1])+'</b> <span class="muted">· harm to native species · '+esc(SRCN[r.esrc])+"</span></p>";
+  if(r.ei!=="NE"){h+='<p class="cnote">'+esc(ed[2])+"</p>"
+    +factList([["Evidence",evidenceOf(r.esrc,m.eicat_n_records,m.eicat_n_sources,m.eicat_agreement,runs)],
+      [r.esrc==="gidias"?"Amount of evidence":"Confidence",r.econf],["Mechanism",m.eicat_mechanism],["Affected native taxa",m.affected_native_taxa],
+      ["Recorded in",m.eicat_countries],["All rated records",m.eicat_records_by_category],["Published IUCN assessment",m.eicat_expert]]);
+    if(m.eicat_justification!=null)h+='<p style="font-size:13.5px;margin:10px 0 0">'+esc(m.eicat_justification)+"</p>";
+    h+=refsHTML(m.eicat_reference,r.esrc==="llm")}
+  if(r.si!=="NE"){var sd=SDEF[r.si];
+    h+='<p class="ih">'+sBadge(r)+" <b>SEICAT · "+esc(sd[0])+'</b> <span class="muted">· harm to people\'s activities · '+esc(SRCN[r.ssrc])+"</span></p>"
+      +'<p class="cnote">'+esc(sd[1])+"</p>"
+      +factList([["Evidence",evidenceOf(r.ssrc,m.seicat_n_records,m.seicat_n_sources,m.seicat_agreement,runs)],
+        [r.ssrc==="gidias"?"Amount of evidence":"Confidence",m.seicat_confidence],["Aspects of well-being",m.seicat_constituents]]);
+    if(m.seicat_justification!=null)h+='<p style="font-size:13.5px;margin:10px 0 0">'+esc(m.seicat_justification)+"</p>"}
+  else h+='<p class="ih"><span class="eb e-NE">NE</span> <b>SEICAT</b> <span class="muted">· no rated impact on people'+(+m.cwb_n_negative>0?"; "+(+m.cwb_n_negative)+" GIDIAS record"+(+m.cwb_n_negative===1?"":"s")+" report harm to people without a magnitude":"")+"</span></p>";
+  var nc=m.impact_n_countries,ctx=factList([["Realms",listOf(m.impact_realms).join(", ")],
+    ["Countries with documented impact",nc!=null?(+nc)+(m.impact_countries?": "+listOf(m.impact_countries).join(", "):""):m.impact_countries],
+    ["Contributions to people reduced",listOf(m.ncp_categories).join(", ")],
+    ["Benefits to native species documented",yes(m.positive_nature)?"yes":null],["Benefits to people documented",yes(m.positive_people)?"yes":null],
+    ["Global extinction of a native taxon",yes(m.global_extinction)?"recorded":null],
+    ["All GIDIAS records",m.impact_n_records!=null?(+m.impact_n_records).toLocaleString("en")+" from "+(+m.impact_n_sources||0).toLocaleString("en")+" source"+(+m.impact_n_sources===1?"":"s"):null],
+    ["Language model",r.esrc==="llm"||r.ssrc==="llm"?(r.emodel||"not named")+(m.impact_date?", "+m.impact_date:""):null]]);
+  if(ctx)h+='<p class="ih"><b>Where and what else</b></p>'+ctx;
+  if(r.esrc==="gidias"||r.ssrc==="gidias")h+='<p class="note">GIDIAS categories are the highest magnitude that any single publication reports. They summarise evidence and are not an IUCN assessment.'+(r.esrc==="gidias"&&r.ei==="MR"?" GIDIAS does not record whether a local extinction is reversible, so this Major could be Massive.":"")+"</p>";
+  if(r.esrc==="llm"||r.ssrc==="llm")h+='<p class="note">'+(r.esrc==="llm"&&r.ssrc==="llm"?"Both categories were":r.esrc==="llm"?"The EICAT category was":"The SEICAT category was")+" proposed by a language model. It may be wrong, and any source it names needs checking. Treat it as a pointer for where to look first.</p>";
+  else if(r.esrc==="other"||r.esrc==="expert")h+='<p class="cnote">From the EICAT columns of an older list file.</p>';
+  return h}
 function supportHTML(r){var o=r.raw,h='<h4>Data support</h4>';
-  if(r.sc<0&&r.sh==null)return h+'<p class="muted" style="font-size:13px">This scan file has no data-support columns. Re-run notebook 05 (version 3) to add them.</p>';
+  if(r.sc<0&&r.sh==null)return h+'<p class="muted" style="font-size:13px">This scan file has no data-support columns.</p>';
   var sat=Math.log(21),part=function(n){return n==null?null:Math.min(1,Math.log(1+(+n))/sat)};
   var rowH=function(lab,val,f){return'<div class="lab">'+lab+'</div><div class="val">'+val+'</div>'+(f==null?'<div></div>':'<span class="rb"><span style="width:'+(f*100).toFixed(0)+'%"></span></span>')};
   var MEAN=["little evidence: few known locations or interactions, or the native range is unknown","some evidence","well documented"];
@@ -636,8 +838,8 @@ function supportHTML(r){var o=r.raw,h='<h4>Data support</h4>';
     +'</div><p class="cnote">Range and partners count as full from 20 upward. The score itself is not changed by data support.</p>';
   if(r.sh!=null){var raw=o.score_effort_raw;
     h+='<dl class="facts" style="margin-top:12px"><dt>Effort shift</dt><dd>'+fmtShift(r.sh)+'</dd>'
-      +(raw!=null?'<dt>Risk with actual documentation</dt><dd>'+pc(raw)+'</dd>':"")
-      +(o.score_deterministic!=null?'<dt>Risk after effort correction</dt><dd>'+pc(o.score_deterministic)+'</dd>':"")+'</dl>'
+      +(raw!=null?'<dt>Score with actual documentation</dt><dd>'+pc(raw)+'</dd>':"")
+      +(o.score_deterministic!=null?'<dt>Score after effort correction</dt><dd>'+pc(o.score_deterministic)+'</dd>':"")+'</dl>'
       +'<p class="cnote">'+(Math.abs(r.sh)<.0005?"Documentation makes no difference for this species.":r.sh<0?"Its documentation would have pushed it up; the list ranks it as if it were documented like a typical known invader.":"Being poorly documented would have held it back; the correction lifts it to what a typically documented species with the same ecology would score.")+'</p>'}
   if(o.uncertainty_ensemble!=null)h+='<p class="cnote">Of the ± '+pc(r.e)+' uncertainty, the disagreement between ensemble models alone is ± '+pc(o.uncertainty_ensemble)+'.</p>';
   if(r.sc===0)h+='<p class="note">Rests on little evidence. Treat this prediction as a candidate to check, not as a confident result.</p>';
@@ -645,7 +847,7 @@ function supportHTML(r){var o=r.raw,h='<h4>Data support</h4>';
   return h}
 function bar(v,mx){var w=Math.abs(v)/mx*50;return'<div class="track"><i style="background:var('+(v>=0?"--pos":"--neg")+');'+(v>=0?"left:50%":"right:50%")+';width:'+w.toFixed(2)+'%"></i></div><div class="v">'+(v>=0?"+":"−")+Math.abs(v).toFixed(2)+'</div>'}
 function contribHTML(r){var x=S.contrib[key(r.loc,r.id)];
-  if(!x)return'<h4>Feature contributions</h4><p class="muted" style="font-size:13px">No contributions for this species. Notebook 05 explains the top <code>EXPLAIN_TOP_N</code> species of each list; load <code>contributions_'+esc(slug(r.loc))+'.csv</code> to see them.</p>';
+  if(!x)return'<h4>Feature contributions</h4><p class="muted" style="font-size:13px">'+(S.pending[slug(r.loc)]?"Reading the contributions of this location…":'No contributions for this species. The notebooks explain the top <code>EXPLAIN_TOP_N</code> species of each list; load <code>contributions_'+esc(slug(r.loc))+'.csv</code> to see them.')+'</p>';
   var sum=x.items.reduce(function(a,q){return a+q.value},0),bs={};
   x.items.forEach(function(q){bs[q.block]=(bs[q.block]||0)+q.value});
   var bl=Object.keys(bs).sort(function(a,b){return Math.abs(bs[b])-Math.abs(bs[a])}),bmx=Math.max.apply(null,bl.map(function(b){return Math.abs(bs[b])}))||1;
@@ -658,7 +860,7 @@ function clistHTML(r){var x=S.contrib[key(r.loc,r.id)];if(!x)return"";
   var mx=Math.max.apply(null,c.map(function(q){return Math.abs(q.value)}))||1,lim=D.all?c.length:15;
   return'<div class="contrib">'+c.slice(0,lim).map(function(q){return'<div class="nm">'+esc(q.name)+'<small>'+esc(BLOCKS[q.block]||q.block)+'</small></div>'+bar(q.value,mx)}).join("")+'</div>'
     +(c.length>15?'<button class="more" type="button" id="call" style="margin-top:10px">'+(D.all?"Show top 15":"Show all "+c.length+" contributions")+'</button>':"")
-    +'<p class="cnote">Red raises the risk, blue lowers it. Integrated Gradients against an average candidate pair.'+(x.gap!=null&&Math.abs(x.gap)>.05?" Completeness gap "+(+x.gap).toFixed(3)+": raise N_IG_STEPS in notebook 05.":"")+'</p>'}
+    +'<p class="cnote">Red raises the risk, blue lowers it. Integrated Gradients against an average candidate pair.'+(x.gap!=null&&Math.abs(x.gap)>.05?" Completeness gap "+(+x.gap).toFixed(3)+": raise N_IG_STEPS when exporting.":"")+'</p>'}
 function nkey(t,id){return t+"|"+id}
 function salSVG(nodes,edges){
   var W=600,H=470,cx=W/2,cy=H/2,R1=100,R2=180,pos={};
@@ -676,7 +878,7 @@ function salSVG(nodes,edges){
   edges.forEach(function(e){var a=pos[nkey(e.src_type,e.src_gbif_id)],b=pos[nkey(e.dst_type,e.dst_gbif_id)];if(a&&b)s+='<line x1="'+a[0].toFixed(1)+'" y1="'+a[1].toFixed(1)+'" x2="'+b[0].toFixed(1)+'" y2="'+b[1].toFixed(1)+'" stroke="var(--mute)" stroke-opacity=".45"><title>'+esc(e.relation)+'</title></line>'});
   nodes.forEach(function(n){var p=pos[nkey(n.node_type,n.node_gbif_id)];if(!p)return;var v=n.contribution||0,f=Math.abs(v)/mx,r=n.hop===0?15:5+11*Math.sqrt(f),top=n.in_top_k!==false;
     var fill=top?"var("+(v>=0?"--pos":"--neg")+")":"var(--line)";
-    s+='<g><title>'+esc(n.node_name)+" ("+esc(n.node_type)+", hop "+n.hop+")\n"+esc(n.relation_path||"")+"\ncontribution "+(v>=0?"+":"")+v.toFixed(3)+(n.contribution_share!=null?" ("+(n.contribution_share*100).toFixed(1)+"%)":"")+'</title>'
+    s+='<g><title>'+esc(n.node_name)+" ("+esc(n.node_type)+", hop "+esc(n.hop)+")\n"+esc(n.relation_path||"")+"\ncontribution "+(v>=0?"+":"")+v.toFixed(3)+(n.contribution_share!=null?" ("+(n.contribution_share*100).toFixed(1)+"%)":"")+'</title>'
       +'<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="'+r.toFixed(1)+'" fill="'+fill+'" fill-opacity="'+(top?(.35+.65*f).toFixed(2):1)+'" stroke="var(--ink)" stroke-width="'+(n.hop===0?2.5:.8)+'"'+(top?"":' stroke-dasharray="2 2"')+'/>';
     var lbl=String(n.node_name||"");if(lbl.length>22)lbl=lbl.slice(0,21)+"…";
     if(n.hop===0)s+='<text x="'+p[0].toFixed(1)+'" y="'+(p[1]+r+14).toFixed(1)+'" text-anchor="middle" font-weight="600">'+esc(lbl)+'</text>';
@@ -686,7 +888,7 @@ function salSVG(nodes,edges){
     s+="</g>"});
   return s+"</svg>"}
 function salHTML(r){var k=key(r.loc,r.id),nodes=S.salN[k],edges=S.salE[k]||[];
-  if(!nodes)return'<h4>GNN saliency map</h4><p class="muted" style="font-size:13px">No saliency map for this species. Notebook 05 maps the top <code>SALIENCY_TOP_N</code> species of each list; load <code>gnn_saliency_nodes_'+esc(slug(r.loc))+'.csv</code> and <code>gnn_saliency_edges_'+esc(slug(r.loc))+'.csv</code>.</p>';
+  if(!nodes)return'<h4>GNN saliency map</h4><p class="muted" style="font-size:13px">'+(S.pending[slug(r.loc)]?"Reading the saliency maps of this location…":'No saliency map for this species. The notebooks map the top <code>SALIENCY_TOP_N</code> species of each list; load <code>gnn_saliency_nodes_'+esc(slug(r.loc))+'.csv</code> and <code>gnn_saliency_edges_'+esc(slug(r.loc))+'.csv</code>.')+'</p>';
   var top=nodes.filter(function(n){return n.in_top_k!==false}).sort(function(a,b){return Math.abs(b.contribution)-Math.abs(a.contribution)});
   var mx=Math.max.apply(null,top.map(function(n){return Math.abs(n.contribution_share||0)}))||1;
   return'<h4>GNN saliency map</h4><p class="muted" style="margin:0;font-size:13px">Graph nodes within two steps that drive the species graph embedding. Centre: the species; inner ring: direct neighbours; outer ring: their neighbours.</p>'
@@ -694,16 +896,16 @@ function salHTML(r){var k=key(r.loc,r.id),nodes=S.salN[k],edges=S.salE[k]||[];
     +'<div class="legend"><span><i style="background:var(--pos)"></i>raises the score</span><span><i style="background:var(--neg)"></i>lowers the score</span><span><i style="background:var(--line);border:1px dashed var(--ink)"></i>link only (outside the top nodes)</span><span>size = |gradient × input|</span></div>'
     +'<div class="tw"><table class="nodes"><thead><tr><th>Node</th><th>Hop</th><th>Share</th></tr></thead><tbody>'
     +top.map(function(n){var sh=n.contribution_share!=null?n.contribution_share:0,w=Math.abs(sh)/mx*100;
-      return'<tr><td><b>'+esc(n.node_name)+'</b> <span class="muted">'+esc(n.node_type)+'</span><div class="path">'+esc(n.relation_path||"")+'</div></td><td>'+n.hop+'</td><td style="white-space:nowrap"><span class="sh"><i style="width:'+w.toFixed(1)+'%;background:var('+(sh>=0?"--pos":"--neg")+')"></i></span>'+(sh>=0?"+":"−")+Math.abs(sh*100).toFixed(1)+'%</td></tr>'}).join("")
+      return'<tr><td><b>'+esc(n.node_name)+'</b> <span class="muted">'+esc(n.node_type)+'</span><div class="path">'+esc(n.relation_path||"")+'</div></td><td>'+esc(n.hop)+'</td><td style="white-space:nowrap"><span class="sh"><i style="width:'+w.toFixed(1)+'%;background:var('+(sh>=0?"--pos":"--neg")+')"></i></span>'+(sh>=0?"+":"−")+Math.abs(sh*100).toFixed(1)+'%</td></tr>'}).join("")
     +'</tbody></table></div><p class="cnote">Share = contribution / sum of absolute contributions in the map (gradient × input on node features). A first-order, local explanation of the model, not a causal claim.</p>'}
 function openD(r){D={r:r,block:"all",all:false};var d=$("#drawer");d.classList.add("open");var o=r.raw;
   var tax=[o.family,o.order,o["class"]].filter(Boolean).map(esc).join(" · ");
-  $("#dbody").innerHTML='<h3>'+esc(r.name)+'</h3><div class="meta"><span>'+symSVG(r.g,13)+GROUPS[r.g].n+'</span><span>Rank '+r.rank+' for '+esc(r.loc)+'</span><span>EICAT <span class="eb e-'+r.ei+'">'+r.ei+'</span></span>'+(r.sc>=0?'<span>Data support '+supBadge(r)+'</span>':"")+(tax?'<span>'+tax+'</span>':"")+'</div>'
-    +'<p style="margin:0"><b style="font-size:24px">'+pc(r.p)+'</b> <span class="muted">invasion risk, ± '+pc(r.e)+'</span></p>'
-    +supportHTML(r)+factsHTML(r)+contribHTML(r)+salHTML(r)
+  $("#dbody").innerHTML='<h3>'+esc(r.name)+'</h3><div class="meta"><span>'+symSVG(r.g,13)+GROUPS[r.g].n+'</span><span>Rank '+r.rank+' for '+esc(r.loc)+'</span><span>EICAT '+eBadge(r)+'</span>'+(r.si!=="NE"?'<span>SEICAT '+sBadge(r)+'</span>':"")+(r.sc>=0?'<span>Data support '+supBadge(r)+'</span>':"")+(tax?'<span>'+tax+'</span>':"")+'</div>'
+    +'<p style="margin:0"><b style="font-size:24px">'+pc(r.p)+'</b> <span class="muted">risk score, ± '+pc(r.e)+'</span></p>'
+    +flagsHTML(r)+supportHTML(r)+factsHTML(r)+impactHTML(r)+contribHTML(r)+salHTML(r)
     ;
   renderClist();
-  document.dispatchEvent(new CustomEvent("horizonscanner:select",{detail:{gbif_id:r.id,taxon_name:r.name,country:r.loc,probability:r.p,uncertainty:r.e,eicat:r.ei,group:GROUPS[r.g].k,data_support:r.sup,data_support_class:r.sc>=0?SUP[r.sc]:null,effort_shift:r.sh}}));
+  document.dispatchEvent(new CustomEvent("horizonscanner:select",{detail:{gbif_id:r.id,taxon_name:r.name,country:r.loc,probability:r.p,uncertainty:r.e,eicat:r.ei,eicat_source:r.esrc,seicat:r.si,seicat_source:r.ssrc,check_flags:r.flags,group:GROUPS[r.g].k,data_support:r.sup,data_support_class:r.sc>=0?SUP[r.sc]:null,effort_shift:r.sh}}));
   $("#dx").focus()}
 function renderClist(){var el=$("#clist");if(!el||!D.r)return;el.innerHTML=clistHTML(D.r);
   var b=$("#call");if(b)b.onclick=function(){D.all=!D.all;renderClist()}}
@@ -717,16 +919,28 @@ function metric(m,k,f){var v=m&&m[k];if(!v)return"–";var x=typeof v==="object"
 function renderCard(){var c=S.card,el=$("#card");
   if(!c){el.innerHTML='<p class="muted">Load <code>model_card.json</code> together with the scan files to see the training date, data versions and cross-validation results of your model here.</p>';$("#mcn").textContent="30";return}
   var M=c.metrics||{},rows=[["random_pairs","Random pairs"],["species_held_out","Species held out"],["temporal","Temporal hold-out"],["production_early_stopping_slice","Production (early-stopping slice)"]].filter(function(r){return M[r[0]]});
-  var pct=function(x){return(x*100).toFixed(1)+"%"};
-  var mc=String(c.uncertainty||"").match(/(\d+)\s*passes/);$("#mcn").textContent=mc?mc[1]:"30";$("#ens").textContent=c.ensemble_size?String(c.ensemble_size):"several";
+  var pct=function(x){return(x*100).toFixed(1)+"%"},num=function(x){return x==null||isNaN(+x)?"–":(+x).toLocaleString("en")};
+  var mc=String(c.uncertainty||"").match(/(\d+)\s*passes/);$("#mcn").textContent=mc?mc[1]:"30";$("#ens").textContent=c.ensemble_size?String(+c.ensemble_size||""):"several";
   var supRows=rows.filter(function(r){return SUP.some(function(l){return M[r[0]]["rank_hit_top10pct_support_"+l]!=null})});
-  el.innerHTML='<h2 style="margin-top:0">This model</h2><p>Trained '+esc(String(c.trained_at||"").replace("T"," "))+' on '+(c.n_positive_pairs!=null?(+c.n_positive_pairs).toLocaleString("en")+" known invasions":"")+(c.n_locations?" across "+c.n_locations+" SInAS locations":"")+(c.n_candidate_species?"; "+(+c.n_candidate_species).toLocaleString("en")+" candidate species":"")+'.</p>'
+  var ablation=c.training&&c.training.limited_data_controls===false,ch=c.checks,im=c.impacts,il=im&&im.llm,ag=il&&il.agreement_with_gidias&&il.agreement_with_gidias.eicat;
+  el.innerHTML='<h2 style="margin-top:0">This model</h2><p>Trained '+esc(String(c.trained_at||"").replace("T"," "))+(c.n_positive_pairs!=null?" on "+num(c.n_positive_pairs)+" known invasions":"")+(c.n_locations?" across "+num(c.n_locations)+" SInAS locations":"")+(c.n_candidate_species?"; "+num(c.n_candidate_species)+" candidate species":"")+'.'
+    +(c.scan&&c.scan.source?" Lists written by <code>"+esc(c.scan.source)+"</code>"+(c.exported_at?" on "+esc(String(c.exported_at).slice(0,10)):"")+".":"")+'</p>'
+    +(ablation?'<p class="note">This model was trained with the limited-data controls switched off (an ablation run). Its lists favour well-documented species; do not use them.</p>':"")
     +(rows.length?'<div class="tw"><table><thead><tr><th>Test</th><th>ROC-AUC</th><th>PR-AUC</th><th>Median rank (top %)</th><th>In top 5%</th><th>In top 10%</th></tr></thead><tbody>'
       +rows.map(function(r){var m=M[r[0]];return"<tr><td>"+r[1]+"</td><td>"+metric(m,"roc_auc")+"</td><td>"+metric(m,"pr_auc")+"</td><td>"+metric(m,"rank_median_top_frac",pct)+"</td><td>"+metric(m,"rank_hit_top5pct",pct)+"</td><td>"+metric(m,"rank_hit_top10pct",pct)+"</td></tr>"}).join("")
-      +'</tbody></table></div><p class="cnote">AUCs compare held-out invasions with unrecorded pairs (in version 3, pairs matched to the invasions on taxonomic group, documentation and location, so they are lower than in version 2). Rank columns place each held-out invasion among its location\'s candidates; lower median and higher hit rates are better. All are lower bounds, because some unrecorded pairs are undetected invasions.</p>':"")
+      +'</tbody></table></div><p class="cnote">AUCs compare held-out invasions with unrecorded pairs matched to them on taxonomic group, documentation and location, which is a harder test than random unrecorded pairs. Rank columns place each held-out invasion among its location\'s candidates; lower median and higher hit rates are better. All are lower bounds, because some unrecorded pairs are undetected invasions, and slightly optimistic, because the training checkpoint was chosen on the same held-out pairs.</p>':"")
     +(supRows.length?'<h2>Does the model find poorly documented species?</h2><div class="tw"><table><thead><tr><th>Test</th><th>Low support</th><th>Medium</th><th>High</th></tr></thead><tbody>'
       +supRows.map(function(r){var m=M[r[0]];return"<tr><td>"+r[1]+"</td>"+SUP.map(function(l){return"<td>"+metric(m,"rank_hit_top10pct_support_"+l,pct)+"</td>"}).join("")+"</tr>"}).join("")
       +'</tbody></table></div><p class="cnote">Share of held-out invasions in the top 10 % of their location\'s list, by data support of the species. Similar values mean the list does not favour well-documented species.</p>':"")
+    +(ch?'<h2>Native-range and GRIIS checks</h2><ul>'+(ch.actions?Object.keys(ch.actions).map(function(k){return"<li><code>"+esc(k)+"</code>: "+esc(ch.actions[k])+"</li>"}).join(""):"")
+      +(ch.griis&&ch.griis.file?"<li>GRIIS file <code>"+esc(ch.griis.file)+"</code>: "+num(ch.griis.rows)+" rows, "+(ch.griis.share_matched!=null?pct(+ch.griis.share_matched):"–")+" matched to a species of the model, "+num(ch.griis.countries)+" countries</li>":"<li>No GRIIS file was used.</li>")
+      +"<li>"+num(ch.native_records)+" SInAS native records"+(ch.extra_native_records?", "+num(ch.extra_native_records)+" extra native records":"")+"</li></ul>":"")
+    +(im?'<h2>Impact data</h2><p>'+esc(im.gidias_version||"GIDIAS")+(im.gidias?": "+num(im.gidias.species)+" species with impact records":"")+(im.master?"; the impact file holds "+num(im.master.species)+" species":"")+(im.date?" (written "+esc(im.date)+")":"")+". "
+      +(il?"For the top "+esc(il.top_x)+" species of the lists that GIDIAS does not cover, <code>"+esc(il.model)+"</code> was asked for the same fields (prompt "+esc(il.prompt_version)+", "+esc(il.n_repeats)+" answer"+(+il.n_repeats>1?"s":"")+" per species).":"No language model was used.")
+      +" Impact data is not used by the risk model.</p>"
+      +(ag&&ag.exact_agreement!=null?'<div class="tw"><table><thead><tr><th>Language model against GIDIAS (EICAT)</th><th></th></tr></thead><tbody>'
+        +"<tr><td>Species compared</td><td>"+num(ag.n_compared)+"</td></tr><tr><td>Same category</td><td>"+pct(+ag.exact_agreement)+"</td></tr><tr><td>Same or neighbouring category</td><td>"+pct(+ag.within_one_category)+"</td></tr><tr><td>Weighted kappa</td><td>"+(+ag.weighted_kappa).toFixed(2)+"</td></tr><tr><td>Mean difference (LLM − GIDIAS, category steps)</td><td>"+(+ag.mean_difference_llm_minus_gidias).toFixed(2)+"</td></tr><tr><td>Answered “data deficient”</td><td>"+pct(+ag.share_answered_dd)+"</td></tr>"
+        +'</tbody></table></div><p class="cnote">GIDIAS species are the well-studied ones, so this is an upper bound for the species the model was actually used on.</p>':(il?'<p class="cnote">The model was not compared with GIDIAS.</p>':"")):"")
     +(c.limited_data_controls?'<h2>Limited-data controls</h2><ul>'+Object.keys(c.limited_data_controls).filter(function(k){return k!=="effort_features"}).map(function(k){var v=c.limited_data_controls[k];return"<li><code>"+esc(k)+"</code>: "+esc(Array.isArray(v)?v.join(", "):v)+"</li>"}).join("")+"</ul>":"")
     +(c.streams?'<h2>Streams in this model</h2><ul>'+Object.keys(c.streams).map(function(k){return"<li><b>"+esc(k)+"</b>: "+esc(c.streams[k])+"</li>"}).join("")+"</ul>":"")
     +(c.inputs?'<h2>Input files</h2><div class="tw"><table><thead><tr><th>Input</th><th>File</th><th>Modified</th></tr></thead><tbody>'+Object.keys(c.inputs).map(function(k){var i=c.inputs[k];return"<tr><td>"+esc(k)+"</td><td><code>"+esc(i.file)+"</code></td><td>"+esc(i.modified)+"</td></tr>"}).join("")+"</tbody></table></div>":"")}
