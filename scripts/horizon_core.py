@@ -13,11 +13,15 @@ Contents
    self-supervised pre-training of the graph encoder
    (``pretrain_on_links``).
 2. ``Scanner``: ranking, uncertainty, feature contributions and GNN
-   saliency maps for one location.
+   saliency maps for one location. Lists are ranked on the ensemble
+   logit; the 0-1 score shown next to it is that logit after the score
+   calibration (``fit_score_calibration``, ``calibrated_probability``).
 3. Impact data: kept out of the lists. Notebook 07 writes
    ``species_impacts_master.csv``; the viewer joins it on ``gbif_id``.
 4. ``ChecklistChecks``: native-range and GRIIS checklist checks that are
-   applied to a ranked list before it is exported.
+   applied to a ranked list before it is exported, and the "native
+   nearby" columns that say how far the nearest native and alien
+   populations are.
 5. ``load_static_scanner`` and ``export_scans``: re-load a checkpoint and
    write the files the viewer reads.
 
@@ -66,6 +70,213 @@ def pretty_feature(column):
     label = re.sub(r"^wc_bio\d\d_", "", label)
     label = re.sub(r"^wc_", "", label)
     return label.replace("_", " ")
+
+
+# ----------------------------------------------------------------------
+# Score calibration
+# ----------------------------------------------------------------------
+# A list is ranked on the ensemble logit. The logit has no fixed scale:
+# a model trained with the positive-unlabeled loss returns logits far
+# above 17, where a 32-bit sigmoid is exactly 1.0 for every species. The
+# calibration maps the logit to a 0-1 score that keeps the order:
+#     probability = sigmoid(slope * logit + intercept)
+# Without a fitted calibration slope = 1 and intercept = 0.
+# Classes of the GBIF Backbone per front-end group. The Backbone gives
+# ray-finned fishes (about 95 % of all fish species) no class at all:
+# their orders hang directly under the phylum Chordata.
+FISH_CLASSES = {"Actinopterygii", "Chondrichthyes", "Elasmobranchii",
+                "Holocephali", "Cephalaspidomorphi", "Petromyzonti",
+                "Myxini", "Sarcopterygii", "Dipneusti", "Coelacanthi",
+                "Teleostei", "Chondrostei", "Holostei", "Cladistii"}
+HERP_CLASSES = {"Amphibia", "Reptilia", "Squamata", "Testudines",
+                "Crocodylia", "Sphenodontia"}
+
+
+def _missing(value):
+    """True for None, NaN and empty strings."""
+    return (value is None or (isinstance(value, float) and math.isnan(value))
+            or (isinstance(value, str) and not value.strip()))
+
+
+def frontend_group(kingdom_name, class_name, phylum_name=None):
+    """Map GBIF Backbone taxonomy to the group keys of the viewer.
+
+    Parameters
+    ----------
+    kingdom_name, class_name : str or None
+    phylum_name : str or None, optional
+        Needed to recognise ray-finned fishes: the Backbone gives them
+        no class, so a chordate without a class is a fish. Without the
+        phylum such a species falls back to ``"invertebrate"``.
+
+    Returns
+    -------
+    str
+        ``"plant"``, ``"fungi"`` (fungi and microbes, incl. Chromista,
+        Bacteria and viruses), ``"fish"``, ``"herp"``, ``"bird"``,
+        ``"mammal"`` or ``"invertebrate"``.
+    """
+    if kingdom_name == "Plantae":
+        return "plant"
+    if kingdom_name != "Animalia":
+        return "fungi"
+    if _missing(class_name):
+        return "fish" if phylum_name == "Chordata" else "invertebrate"
+    if class_name in FISH_CLASSES:
+        return "fish"
+    if class_name in HERP_CLASSES:
+        return "herp"
+    if class_name == "Aves":
+        return "bird"
+    if class_name == "Mammalia":
+        return "mammal"
+    return "invertebrate"
+
+
+def relabel_groups(info):
+    """Recompute the ``group`` column of a species table.
+
+    Checkpoints written before the fish fix label ray-finned fishes
+    "invertebrate". The scanner calls this on its species table, so old
+    checkpoints give correct labels without retraining.
+
+    Parameters
+    ----------
+    info : pandas.DataFrame
+        Needs ``kingdom``, ``phylum`` and ``class``; returned unchanged
+        if one of them is missing.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A copy with ``group`` recomputed; ``.attrs["groups_relabelled"]``
+        holds the number of species whose label changed.
+    """
+    if not {"kingdom", "phylum", "class"} <= set(info.columns):
+        return info
+    out = info.copy()
+    new = [frontend_group(k, c, p) for k, c, p in
+           zip(out["kingdom"], out["class"], out["phylum"])]
+    old = out["group"] if "group" in out.columns else None
+    out["group"] = new
+    out.attrs["groups_relabelled"] = (
+        int((old.to_numpy() != np.asarray(new, dtype=object)).sum())
+        if old is not None else len(out))
+    return out
+
+
+IDENTITY_CALIBRATION = {"slope": 1.0, "intercept": 0.0, "fitted": False}
+
+
+def calibrated_probability(logit, calibration=None):
+    """0-1 score of a logit: sigmoid(slope * logit + intercept).
+
+    Computed in 64-bit, so scores that differ in the logit stay
+    different (a 32-bit sigmoid returns exactly 1.0 above about 16.6).
+
+    Parameters
+    ----------
+    logit : float or array-like
+    calibration : dict, optional
+        ``slope`` and ``intercept`` (default: the identity).
+
+    Returns
+    -------
+    numpy.ndarray
+        Same shape as ``logit``, dtype float64.
+    """
+    cal = calibration or IDENTITY_CALIBRATION
+    t = (float(cal.get("slope", 1.0)) * np.asarray(logit, dtype=np.float64)
+         + float(cal.get("intercept", 0.0)))
+    return np.exp(-np.logaddexp(0.0, -t))
+
+
+def fit_score_calibration(logits, is_positive, weight=None, n_iter=100):
+    """Fit ``sigmoid(slope * logit + intercept)`` to held-out pairs.
+
+    Platt scaling (Platt 1999): a logistic regression with the logit as
+    its only input, fitted by Newton steps. The order of the scores does
+    not change (the slope is positive), so a list ranks the same before
+    and after; only the 0-1 scale changes.
+
+    The fitted score is the share of recorded invasions among pairs with
+    that logit **in the mix of pairs passed in** (notebook 05: held-out
+    invasions and matched unrecorded pairs, 1 : ``VAL_NEG_RATIO``). It is
+    not a probability of establishment.
+
+    Parameters
+    ----------
+    logits : array-like, shape (n,)
+        Model logits of held-out pairs.
+    is_positive : array-like of bool, shape (n,)
+        True for held-out invasions, False for unrecorded pairs.
+    weight : array-like, shape (n,), optional
+        Pair weights (default 1).
+    n_iter : int
+        Maximum number of Newton steps.
+
+    Returns
+    -------
+    dict
+        ``slope``, ``intercept``, ``fitted``, ``n_positives``,
+        ``n_unlabeled``, ``log_loss_uncalibrated`` and
+        ``log_loss_calibrated`` (weighted mean log loss before / after).
+        If the fit fails, the identity with ``fitted`` False.
+    """
+    z = np.asarray(logits, dtype=np.float64).ravel()
+    y = np.asarray(is_positive, dtype=np.float64).ravel()
+    w = (np.ones_like(z) if weight is None
+         else np.asarray(weight, dtype=np.float64).ravel())
+    check(len(z) == len(y) == len(w), "logits, labels and weights differ "
+                                      "in length.")
+    check(0 < y.sum() < len(y), "The calibration needs positives and "
+                                "unlabeled pairs.")
+    mu, sd = float(z.mean()), max(float(z.std()), 1e-12)
+    x = (z - mu) / sd  # standardised input keeps the Newton steps stable
+    w_sum = w.sum()
+
+    def log_loss(a, b):
+        t = a * x + b
+        return float((w * (np.logaddexp(0.0, t) - y * t)).sum() / w_sum)
+
+    base = float((w * y).sum() / w_sum)
+    a, b = 0.0, math.log(base / (1.0 - base))
+    loss = log_loss(a, b)
+    for _ in range(n_iter):
+        p = np.exp(-np.logaddexp(0.0, -(a * x + b)))
+        g, h = w * (p - y), w * p * (1.0 - p)
+        ga, gb = float((g * x).sum()), float(g.sum())
+        haa = float((h * x * x).sum()) + 1e-9
+        hab, hbb = float((h * x).sum()), float(h.sum()) + 1e-9
+        det = haa * hbb - hab * hab
+        if det <= 0:
+            break
+        da, db = (hbb * ga - hab * gb) / det, (haa * gb - hab * ga) / det
+        step, accepted = 1.0, False
+        while step > 1e-6:  # halve the step until the loss does not rise
+            new_a, new_b = a - step * da, b - step * db
+            new_loss = log_loss(new_a, new_b)
+            if new_loss <= loss:
+                accepted = True
+                break
+            step /= 2.0
+        if not accepted:
+            break
+        gain = loss - new_loss
+        a, b, loss = new_a, new_b, new_loss
+        if gain < 1e-12:
+            break
+    slope, intercept = a / sd, b - a * mu / sd
+    if not (math.isfinite(slope) and math.isfinite(intercept)
+            and slope > 0):
+        warnings.warn("The score calibration could not be fitted; scores "
+                      "stay uncalibrated.")
+        return dict(IDENTITY_CALIBRATION)
+    return {"slope": float(slope), "intercept": float(intercept),
+            "fitted": True, "n_positives": int(y.sum()),
+            "n_unlabeled": int(len(y) - y.sum()),
+            "log_loss_uncalibrated": log_loss(sd, mu),
+            "log_loss_calibrated": loss}
 
 
 # ======================================================================
@@ -643,10 +854,16 @@ class PairFeatureBuilder:
             mean, std, self.s["co_niche"][co])
         d = self.s["dist_km"][co]
         nearest = torch.where(mask > 0, d, torch.full_like(d, float("inf")))
+        nearest_km, nearest_idx = nearest.min(dim=1)
+        # row of the nearest range location; -1 for an empty range
+        nearest_idx = torch.where(torch.isinf(nearest_km),
+                                  torch.full_like(nearest_idx, -1),
+                                  nearest_idx)
         return {
             "feat_mahalanobis_distance": mdist.squeeze(1),
             "feat_koppen_overlap": self.koppen(sp, co, mask=mask)[:, 0],
-            "feat_nearest_range_km": nearest.amin(dim=1),
+            "feat_nearest_range_km": nearest_km,
+            "feat_nearest_range_idx": nearest_idx,
             "feat_n_range_locations": mask.sum(dim=1),
             "feat_biotic_opp_positive": self.raw_opportunity("pos", sp, co),
             "feat_biotic_opp_negative": self.raw_opportunity("neg", sp, co),
@@ -727,6 +944,17 @@ def pu_risk(logits, is_pos, weight, prior, region, neg_ratio=1.0):
     pairs. Positives keep their full weight, so with ``prior`` = 0 this
     is the usual weighted cross-entropy without label smoothing. A
     region without positives in the batch uses the batch-wide mean_p.
+
+    .. warning:: With the logistic loss this risk has no upper limit on
+       the logits. The term ``- prior_r * mean_p[l-]`` grows with the
+       logits of the positives, so the optimiser keeps raising them, and
+       where the floor at zero is reached the unlabeled pairs of that
+       region get no gradient at all. The ranking metrics do not show
+       it, but the sigmoid of the logits ends up at 1.0 for the whole
+       top of a list. ``LOSS = "bce"`` in notebook 05 (label smoothing
+       bounds the logits) does not have this problem and is the
+       recommended setting. Lists of a model trained with this loss are
+       ranked on the logit and need the score calibration.
 
     Parameters
     ----------
@@ -978,11 +1206,18 @@ class Scanner:
     ``members``: list of dicts with ``model``, ``encoder``, ``sp_emb``
     (scan mode), ``sp_emb_raw`` (actual effort features) and
     ``baseline`` (Integrated-Gradients baseline leaves).
+
+    ``score_calibration`` (``slope``, ``intercept``; see
+    :func:`fit_score_calibration`) turns logits into the 0-1 scores of
+    the exports. Default: ``meta["score_calibration"]`` if the
+    checkpoint has one, else the identity. Ranking always uses the
+    logit, so the calibration never changes the order of a list.
     """
 
     def __init__(self, members, builder, exclude_mask, eligible_mask,
                  meta, x_dict=None, edge_index_dict=None, n_mc_samples=30,
-                 n_ig_steps=50, saliency_top_k=15, gbif_sleep_s=0.2):
+                 n_ig_steps=50, saliency_top_k=15, gbif_sleep_s=0.2,
+                 score_calibration=None):
         self.n_mc_samples = int(n_mc_samples)
         self.n_ig_steps = int(n_ig_steps)
         self.saliency_top_k = int(saliency_top_k)
@@ -1001,9 +1236,15 @@ class Scanner:
         self.device = members[0]["sp_emb"].device
         self.co_to_idx = {c: i for i, c in
                           enumerate(meta["all_country_names"])}
-        self.info = meta["species_info"].reset_index(drop=True)
+        # group labels recomputed: older checkpoints call fishes
+        # "invertebrate" (see frontend_group)
+        self.info = relabel_groups(
+            meta["species_info"].reset_index(drop=True))
         self.features = leaf_feature_table(meta)
         self.correct_effort = meta.get("effort_correction") == "neutralize"
+        self.calibration = dict(score_calibration
+                                or meta.get("score_calibration")
+                                or IDENTITY_CALIBRATION)
         self._in_csr = None
 
     # ------------------------------------------------------------ scoring
@@ -1014,32 +1255,55 @@ class Scanner:
         return self.co_to_idx[location]
 
     def rank(self, location):
-        """All candidates of a location, sorted by the ensemble score."""
+        """All candidates of a location, sorted by the ensemble logit.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per candidate, best first: ``sp_idx``;
+            ``score_logit`` (mean logit of the members, scan mode; the
+            ranking key); ``score_logit_effort_raw`` (the same with the
+            actual effort features); ``score_deterministic`` and
+            ``score_effort_raw`` (their calibrated 0-1 scores);
+            ``rank_all_candidates`` and ``rank_effort_raw`` (position
+            among all candidates in scan mode / with the actual effort
+            features).
+        """
         c = self.location_index(location)
         cand = (self.eligible & ~self.exclude[:, c]).nonzero(as_tuple=True)[0]
         if len(cand) == 0:
             raise ValueError(f"No candidates for {location}.")
         co = torch.full_like(cand, c)
-        logits = ensemble_logits(self.members, self.builder, cand, co)
+        logits = ensemble_logits(self.members, self.builder, cand,
+                                 co).double().cpu().numpy()
+        raw = (ensemble_logits(self.members, self.builder, cand, co,
+                               raw=True).double().cpu().numpy()
+               if self.correct_effort else logits)
+        n = len(logits)
+        rank_raw = np.empty(n, dtype=np.int64)
+        rank_raw[np.argsort(-raw, kind="stable")] = np.arange(1, n + 1)
         out = pd.DataFrame({
             "sp_idx": cand.cpu().numpy(),
-            "score_deterministic": torch.sigmoid(logits).cpu().numpy()})
-        if self.correct_effort:
-            raw = ensemble_logits(self.members, self.builder, cand, co,
-                                  raw=True)
-            out["score_effort_raw"] = torch.sigmoid(raw).cpu().numpy()
-        else:
-            out["score_effort_raw"] = out["score_deterministic"]
-        return out.sort_values("score_deterministic", ascending=False,
-                               ignore_index=True)
+            "score_logit": logits,
+            "score_logit_effort_raw": raw,
+            "score_deterministic": calibrated_probability(
+                logits, self.calibration),
+            "score_effort_raw": calibrated_probability(raw,
+                                                       self.calibration),
+            "rank_effort_raw": rank_raw})
+        # Sorted on the logit, not on the 0-1 score: scores can be equal
+        # where logits still differ.
+        out = out.sort_values("score_logit", ascending=False, kind="stable",
+                              ignore_index=True)
+        out["rank_all_candidates"] = np.arange(1, n + 1)
+        return out
 
     @torch.no_grad()
-    def mc_dropout(self, sp, co, n_samples=None):
-        """MC dropout in every member.
+    def mc_dropout_logits(self, sp, co, n_samples=None):
+        """Logits of MC-dropout passes in every member.
 
-        Returns (mean, total SD, SE, SD between member means) of the
-        probability, as numpy arrays. ``n_samples`` defaults to the
-        scanner's ``n_mc_samples``.
+        Returns a float64 numpy array of shape (members, passes, pairs).
+        ``n_samples`` defaults to the scanner's ``n_mc_samples``.
         """
         n_samples = n_samples or self.n_mc_samples
         leaves = self.builder.build(sp, co, neutral=True)
@@ -1053,17 +1317,33 @@ class Scanner:
                 d.train()
             x = with_embedding(leaves, sp, m["sp_emb"])
             per_member.append(torch.stack(
-                [torch.sigmoid(model(x)[0]) for _ in range(n_samples)]))
+                [model(x)[0] for _ in range(n_samples)]))
             for d in dropouts:
                 d.eval()
-        probs = torch.stack(per_member)  # (members, passes, pairs)
-        flat = probs.reshape(-1, probs.shape[-1])
-        sd = flat.std(dim=0)
-        between = (probs.mean(dim=1).std(dim=0) if len(self.members) > 1
-                   else torch.zeros_like(sd))
-        return (flat.mean(dim=0).cpu().numpy(), sd.cpu().numpy(),
-                (sd / math.sqrt(flat.shape[0])).cpu().numpy(),
-                between.cpu().numpy())
+        return torch.stack(per_member).double().cpu().numpy()
+
+    @staticmethod
+    def _spread(values):
+        """(total SD, SD between member means) of (members, passes, pairs)."""
+        flat = values.reshape(-1, values.shape[-1])
+        sd = (flat.std(axis=0, ddof=1) if flat.shape[0] > 1
+              else np.zeros(flat.shape[1]))
+        between = (values.mean(axis=1).std(axis=0, ddof=1)
+                   if values.shape[0] > 1 else np.zeros(flat.shape[1]))
+        return sd, between
+
+    def mc_dropout(self, sp, co, n_samples=None):
+        """MC dropout in every member, on the calibrated 0-1 score.
+
+        Returns (mean, total SD, SE, SD between member means) as numpy
+        arrays. ``n_samples`` defaults to the scanner's ``n_mc_samples``.
+        """
+        probs = calibrated_probability(
+            self.mc_dropout_logits(sp, co, n_samples), self.calibration)
+        sd, between = self._spread(probs)
+        n_passes = probs.shape[0] * probs.shape[1]
+        return (probs.reshape(n_passes, -1).mean(axis=0), sd,
+                sd / math.sqrt(n_passes), between)
 
     # ------------------------------------------------- feature contributions
     def explain(self, sp_i, co_i, n_steps=None):
@@ -1108,8 +1388,10 @@ class Scanner:
                   for leaf, idx in zip(self.features["leaf"],
                                        self.features["index"])]
         table = self.features.assign(value=values)
-        summary = {"probability": 1 / (1 + math.exp(-logit)),
-                   "baseline_probability": 1 / (1 + math.exp(-base_logit)),
+        summary = {"probability": float(calibrated_probability(
+                       logit, self.calibration)),
+                   "baseline_probability": float(calibrated_probability(
+                       base_logit, self.calibration)),
                    "ig_completeness_gap": (logit - base_logit) - sum(values)}
         return table, summary
 
@@ -1253,6 +1535,10 @@ class Scanner:
         ``gbif_code`` (ISO-2) additionally drops candidates with live
         GBIF records in that country.
 
+        The list is ordered by ``score_logit`` (the ensemble logit).
+        ``probability`` is that logit after the score calibration;
+        MC dropout only supplies the uncertainty columns.
+
         Returns a dict of DataFrames: scan, contributions, saliency_nodes,
         saliency_edges, and checks_dropped (candidates removed by the
         checks, with the reason).
@@ -1261,6 +1547,12 @@ class Scanner:
         ranked = self.rank(location)
         dropped = pd.DataFrame()
         if checks is not None:
+            # distances for the "native nearby" columns, unless the
+            # checks were given their own
+            checks.attach_geography(
+                self.builder.s["dist_km"],
+                self.meta.get("neighbour_radius_km", 1000.0),
+                self.builder.P)
             ranked, dropped = checks.apply(ranked, location, self.info,
                                            top_n)
         if gbif_code:
@@ -1273,25 +1565,48 @@ class Scanner:
         check_cols = [col for col in ranked.columns if col in CHECK_COLUMNS]
         sp = torch.as_tensor(ranked["sp_idx"].values, device=self.device)
         co = torch.full_like(sp, c)
-        mean, sd, se, between = self.mc_dropout(sp, co)
+        mc_logits = self.mc_dropout_logits(sp, co)
+        sd, between = self._spread(calibrated_probability(mc_logits,
+                                                          self.calibration))
+        sd_logit, _ = self._spread(mc_logits)
+        n_passes = mc_logits.shape[0] * mc_logits.shape[1]
         described = {k: v.cpu().numpy() for k, v in
                      self.builder.describe(sp, co).items()}
+        nearest_idx = described.pop("feat_nearest_range_idx").astype(np.int64)
         scan = pd.DataFrame({
             "sp_idx": ranked["sp_idx"].values,
-            "probability": mean, "uncertainty": sd, "uncertainty_se": se,
+            "probability": ranked["score_deterministic"].values,
+            "uncertainty": sd, "uncertainty_se": sd / math.sqrt(n_passes),
             "uncertainty_ensemble": between,
+            "score_logit": ranked["score_logit"].values,
+            "uncertainty_logit": sd_logit,
             "score_deterministic": ranked["score_deterministic"].values,
             "score_effort_raw": ranked["score_effort_raw"].values,
             **described})
         scan["effort_shift"] = (scan["score_deterministic"]
                                 - scan["score_effort_raw"])
+        scan["effort_shift_logit"] = (
+            ranked["score_logit"].values
+            - ranked["score_logit_effort_raw"].values)
+        # places gained by the effort correction among all candidates
+        # (negative: documentation alone had ranked the species higher)
+        scan["effort_rank_shift"] = (
+            ranked["rank_effort_raw"].values
+            - ranked["rank_all_candidates"].values)
+        scan["rank_all_candidates"] = ranked["rank_all_candidates"].values
+        # nearest range location: its name and what kind of record it is
+        loc_names = np.asarray(list(self.meta["all_country_names"]) + [""],
+                               dtype=object)
+        scan["feat_nearest_range_location"] = loc_names[nearest_idx]
+        if checks is not None:
+            scan["feat_nearest_range_status"] = checks.record_status(
+                ranked["sp_idx"].to_numpy(), nearest_idx)
         if "gbif_occurrence_count" in ranked.columns:
             scan["gbif_occurrence_count"] = (
                 ranked["gbif_occurrence_count"].values)
         for col in check_cols:
             scan[col] = ranked[col].values
-        scan = scan.sort_values("probability", ascending=False,
-                                ignore_index=True)
+        # already in ranking order (by score_logit); no re-sorting
         scan.insert(0, "rank", np.arange(1, len(scan) + 1))
         info_cols = [col for col in SCAN_INFO_COLUMNS
                      if col in self.info.columns]
@@ -1472,6 +1787,10 @@ def attach_eicat(info, path=None):
 # ======================================================================
 CHECK_COLUMNS = ["check_flags", "check_native_target",
                  "check_native_same_country", "check_native_extra",
+                 "check_native_nearby", "check_possible_regional_native",
+                 "native_nearest_km",
+                 "native_nearest_location", "alien_nearest_km",
+                 "alien_nearest_location",
                  "griis_listed", "griis_invasive", "griis_scope"]
 CHECK_ACTIONS = ("drop", "flag", "off")
 # Column names tried (case-insensitive, in this order) in the GRIIS file.
@@ -1679,6 +1998,16 @@ class ChecklistChecks:
                                 island group is scanned)
     ``native_extra``            native in the location according to the
                                 optional extra checklist
+    ``native_nearby``           native (SInAS) in another location whose
+                                centroid lies within ``nearby_km``: the
+                                species may arrive by natural spread, or
+                                already be there unrecorded
+    ``possible_regional_native`` no native record anywhere in SInAS,
+                                in the range within ``nearby_km`` (a
+                                GBIF presence), and no alien record
+                                within ``nearby_km``: the pattern of a
+                                species that is native to the region
+                                but whose native range SInAS lacks
     ``griis_listed``            on the GRIIS checklist of the location's
                                 country: already introduced there
     ``griis_invasive``          GRIIS records evidence of impact there
@@ -1690,6 +2019,34 @@ class ChecklistChecks:
     with other SInAS locations (a sub-national unit or its mainland) a
     GRIIS record cannot be assigned to one of them, so it is only ever
     flagged there (``griis_scope = "country"``), never dropped.
+
+    **Native nearby.** The model's range features use every known
+    location of a species, native ones included, because a native range
+    next door is real evidence that the species can reach and survive in
+    the target. The list alone does not show whether a high score comes
+    from a native range nearby (range expansion) or from alien
+    populations nearby (spread of an introduction). The checks therefore
+    add, per candidate, the distance to and the name of the nearest
+    native location (``native_nearest_km``, ``native_nearest_location``)
+    and, if the alien records are given, of the nearest alien location
+    (``alien_nearest_km``, ``alien_nearest_location``). Distances are
+    between location centroids and need :meth:`attach_geography` (the
+    scanner calls it). ``nearby_action`` decides what happens to
+    candidates that are native within ``nearby_km``: ``"flag"``
+    (default), ``"drop"`` or ``"off"``.
+
+    **Possible regional native.** SInAS records native ranges for only
+    part of its species. A species without any native record that GBIF
+    reports from the surrounding locations, where no checklist calls it
+    alien, is most often simply native to the region (and, with few
+    GBIF records in the target, wrongly a candidate). The model cannot
+    tell: it sees a range next door and scores the species very high.
+    ``regional_native_action`` flags (default) or drops these. The rule
+    needs the alien records, the distances and the model's range matrix
+    (``range_mat``, supplied by the scanner); without them it finds
+    nothing. It is a heuristic: a real invader whose alien status is
+    not yet in SInAS for the neighbouring locations is flagged too, so
+    read the flagged species before dropping them.
 
     Parameters
     ----------
@@ -1708,18 +2065,40 @@ class ChecklistChecks:
         name) or ``iso3``.
     native_action, same_country_action, griis_action : str
         One of CHECK_ACTIONS.
+    alien_pairs : tuple of arrays, optional
+        ``(species rows, location rows)`` of the SInAS alien records
+        (the positives), for the nearest alien location.
+    dist_km : array-like, shape (N, N), optional
+        Distances between the location centroids. Usually left out: the
+        scanner supplies the model's own matrix.
+    nearby_km : float, optional
+        Radius of the "native nearby" finding (default: the model's
+        ``NEIGHBOUR_RADIUS_KM``, supplied by the scanner).
+    nearby_action : str
+        One of CHECK_ACTIONS.
+    regional_native_action : str
+        One of CHECK_ACTIONS, for ``possible_regional_native``.
+    range_mat : array-like or torch.Tensor, shape (S, N), optional
+        The model's range matrix (> 0 where a species is known from a
+        location, GBIF presences included). Usually left out: the
+        scanner supplies it.
     """
 
     def __init__(self, info, location_names, location_iso3=None,
                  native_pairs=None, griis=None, extra_native=None,
                  native_action="drop", same_country_action="flag",
-                 griis_action="drop"):
-        for action in (native_action, same_country_action, griis_action):
+                 griis_action="drop", alien_pairs=None, dist_km=None,
+                 nearby_km=None, nearby_action="flag",
+                 regional_native_action="flag", range_mat=None):
+        for action in (native_action, same_country_action, griis_action,
+                       nearby_action, regional_native_action):
             check(action in CHECK_ACTIONS,
                   f"Check actions must be one of {CHECK_ACTIONS}.")
         self.actions = {"native": native_action,
                         "same_country": same_country_action,
-                        "griis": griis_action}
+                        "griis": griis_action,
+                        "nearby": nearby_action,
+                        "regional_native": regional_native_action}
         self.names = list(location_names)
         self.n_loc = len(self.names)
         self.loc_index = {name: i for i, name in enumerate(self.names)}
@@ -1736,6 +2115,12 @@ class ChecklistChecks:
         self.native_codes = self._codes(native_pairs)
         self.extra_codes = self._codes(self._extra_pairs(info, extra_native,
                                                          by_iso))
+        self.alien_codes = self._codes(alien_pairs)
+        self.has_alien = alien_pairs is not None
+        # species with at least one SInAS native record
+        self.native_species = np.unique(self.native_codes // self.n_loc)
+        self.dist_km, self.nearby_km, self.range_mat = None, None, None
+        self.attach_geography(dist_km, nearby_km, range_mat)
         self.griis_listed, self.griis_invasive = {}, {}
         if griis is not None and len(griis):
             for code, grp in griis.groupby("iso3"):
@@ -1747,6 +2132,9 @@ class ChecklistChecks:
             "actions": dict(self.actions),
             "native_records": int(len(self.native_codes)),
             "extra_native_records": int(len(self.extra_codes)),
+            "alien_records": (int(len(self.alien_codes))
+                              if self.has_alien else None),
+            "native_nearby_km": self.nearby_km,
             "griis": (dict(griis.attrs.get("report", {}))
                       if griis is not None else None),
             "locations_without_iso3": [n for n, c in zip(self.names,
@@ -1786,6 +2174,121 @@ class ChecklistChecks:
             co_rows += targets
         return np.asarray(sp_rows), np.asarray(co_rows)
 
+    def attach_geography(self, dist_km=None, nearby_km=None,
+                         range_mat=None):
+        """Set distances, "nearby" radius and range matrix if still unset.
+
+        Values given to the constructor are kept, so the scanner can call
+        this with the model's own inputs as defaults.
+
+        Parameters
+        ----------
+        dist_km : array-like or torch.Tensor, shape (N, N), optional
+        nearby_km : float, optional
+        range_mat : array-like or torch.Tensor, shape (S, N), optional
+        """
+        if self.range_mat is None and range_mat is not None:
+            check(range_mat.shape[1] == self.n_loc,
+                  "range_mat must have one column per location.")
+            self.range_mat = range_mat
+        if self.dist_km is None and dist_km is not None:
+            if hasattr(dist_km, "detach"):  # a torch tensor
+                dist_km = dist_km.detach().cpu().numpy()
+            dist_km = np.asarray(dist_km, dtype=np.float64)
+            check(dist_km.shape == (self.n_loc, self.n_loc),
+                  "dist_km must be a locations x locations matrix.")
+            self.dist_km = dist_km
+        if self.nearby_km is None and nearby_km is not None:
+            self.nearby_km = float(nearby_km)
+            if hasattr(self, "report"):
+                self.report["native_nearby_km"] = self.nearby_km
+
+    def _nearest(self, codes, sp, c):
+        """Nearest location with a record of each species, target left out.
+
+        Parameters
+        ----------
+        codes : numpy.ndarray
+            Sorted ``species * n_locations + location`` codes.
+        sp : numpy.ndarray
+            Species rows.
+        c : int
+            Target location row.
+
+        Returns
+        -------
+        (numpy.ndarray, numpy.ndarray)
+            Distance in km (inf where the species has no such record or
+            no distance matrix is attached) and the location row (-1).
+        """
+        km = np.full(len(sp), np.inf)
+        loc = np.full(len(sp), -1, dtype=np.int64)
+        if self.dist_km is None or not len(codes) or not len(sp):
+            return km, loc
+        rec_sp, rec_co = codes // self.n_loc, codes % self.n_loc
+        keep = rec_co != c
+        rec_sp, rec_co = rec_sp[keep], rec_co[keep]
+        if not len(rec_sp):
+            return km, loc
+        d = self.dist_km[c, rec_co]
+        order = np.lexsort((d, rec_sp))  # per species, nearest first
+        rec_sp, rec_co, d = rec_sp[order], rec_co[order], d[order]
+        first = np.r_[True, rec_sp[1:] != rec_sp[:-1]]
+        u_sp, u_co, u_d = rec_sp[first], rec_co[first], d[first]
+        pos = np.minimum(np.searchsorted(u_sp, sp), len(u_sp) - 1)
+        hit = u_sp[pos] == sp
+        km[hit], loc[hit] = u_d[pos[hit]], u_co[pos[hit]]
+        return km, loc
+
+    def _range_nearby(self, sp, c):
+        """True where a species is known from a location near ``c``.
+
+        "Known" is the model's range (SInAS records and GBIF presences);
+        "near" is within ``nearby_km`` of the target, the target itself
+        left out. All False without a range matrix, distances or radius.
+        """
+        out = np.zeros(len(sp), dtype=bool)
+        if (self.range_mat is None or self.dist_km is None
+                or self.nearby_km is None or not len(sp)):
+            return out
+        near = np.flatnonzero(self.dist_km[c] <= self.nearby_km)
+        near = near[near != c]
+        if not len(near):
+            return out
+        rm = self.range_mat
+        if hasattr(rm, "detach"):  # a torch tensor (possibly on the GPU)
+            rows = torch.as_tensor(sp, dtype=torch.long, device=rm.device)
+            cols = torch.as_tensor(near, dtype=torch.long, device=rm.device)
+            for start in range(0, len(sp), 8192):  # bounded memory
+                part = rm[rows[start:start + 8192]][:, cols]
+                out[start:start + 8192] = (part > 0).any(dim=1).cpu().numpy()
+            return out
+        return (np.asarray(rm)[np.ix_(sp, near)] > 0).any(axis=1)
+
+    def record_status(self, sp, locations):
+        """Kind of record a species has in a location, per pair.
+
+        Parameters
+        ----------
+        sp, locations : array-like of int
+            Species rows and location rows (-1 = no location).
+
+        Returns
+        -------
+        numpy.ndarray of str
+            ``"native"`` (SInAS native record), ``"alien"`` (SInAS alien
+            record), ``"gbif_only"`` (in the range through a GBIF
+            occurrence only) or ``""`` (no location). Without the alien
+            records every non-native pair is ``"alien_or_gbif"``.
+        """
+        sp = np.asarray(sp, dtype=np.int64)
+        loc = np.asarray(locations, dtype=np.int64)
+        codes = sp * self.n_loc + np.maximum(loc, 0)
+        other = "gbif_only" if self.has_alien else "alien_or_gbif"
+        out = np.where(np.isin(codes, self.alien_codes), "alien", other)
+        out = np.where(np.isin(codes, self.native_codes), "native", out)
+        return np.where(loc < 0, "", out).astype(object)
+
     def _has(self, codes, sp, locations):
         """True where a species has a record in any of ``locations``."""
         out = np.zeros(len(sp), dtype=bool)
@@ -1808,11 +2311,29 @@ class ChecklistChecks:
         siblings = self.siblings.get(c, [])
         empty = np.empty(0, dtype=np.int64)
         listed = np.isin(sp, self.griis_listed.get(code, empty))
+        names = np.asarray(self.names + [""], dtype=object)
+        native_km, native_loc = self._nearest(self.native_codes, sp, c)
+        alien_km, alien_loc = self._nearest(self.alien_codes, sp, c)
+        nearby = (native_km <= self.nearby_km if self.nearby_km is not None
+                  else np.zeros(len(sp), dtype=bool))
+        # no native record anywhere, known from nearby, not alien nearby
+        regional = np.zeros(len(sp), dtype=bool)
+        if (self.has_alien and len(self.native_species)
+                and self.nearby_km is not None):
+            regional = (~np.isin(sp, self.native_species)
+                        & self._range_nearby(sp, c)
+                        & ~(alien_km <= self.nearby_km))
         out = pd.DataFrame({
             "check_native_target": self._has(self.native_codes, sp, [c]),
             "check_native_same_country": self._has(self.native_codes, sp,
                                                    siblings),
             "check_native_extra": self._has(self.extra_codes, sp, [c]),
+            "check_native_nearby": nearby,
+            "check_possible_regional_native": regional,
+            "native_nearest_km": native_km,
+            "native_nearest_location": names[native_loc],
+            "alien_nearest_km": alien_km,
+            "alien_nearest_location": names[alien_loc],
             "griis_listed": listed,
             "griis_invasive": np.isin(sp, self.griis_invasive.get(code,
                                                                   empty)),
@@ -1827,6 +2348,11 @@ class ChecklistChecks:
                  self.actions["native"]),
                 ("native_same_country", "check_native_same_country",
                  self.actions["same_country"]),
+                ("native_nearby", "check_native_nearby",
+                 self.actions["nearby"]),
+                ("possible_regional_native",
+                 "check_possible_regional_native",
+                 self.actions["regional_native"]),
                 ("griis_listed", "griis_listed", self.actions["griis"]),
                 ("griis_invasive", "griis_invasive",
                  self.actions["griis"])):
@@ -1870,6 +2396,16 @@ class ChecklistChecks:
             reasons = reasons.where(
                 ~(flags["check_native_same_country"] & (reasons == "")),
                 "native elsewhere in the same country (SInAS)")
+        if act["nearby"] == "drop" and self.nearby_km is not None:
+            reasons = reasons.where(
+                ~(flags["check_native_nearby"] & (reasons == "")),
+                f"native within {self.nearby_km:.0f} km (SInAS)")
+        if act["regional_native"] == "drop" and self.nearby_km is not None:
+            reasons = reasons.where(
+                ~(flags["check_possible_regional_native"] & (reasons == "")),
+                "possible regional native: no native range on record, "
+                f"present within {self.nearby_km:.0f} km (GBIF) without an "
+                "alien record there")
         if act["griis"] == "drop" and scope == "location":
             reasons = reasons.where(
                 ~(flags["griis_listed"] & (reasons == "")),
@@ -1902,11 +2438,16 @@ class ChecklistChecks:
             "dropped_from_top": int(in_top.sum()),
             "dropped_native": int(dropped["reason"].str.startswith(
                 "native").sum()),
+            "dropped_regional_native": int(dropped["reason"].str.startswith(
+                "possible regional native").sum()),
             "dropped_griis": int(dropped["reason"].str.contains(
                 "GRIIS").sum()),
             "flagged_in_list": int((head["check_flags"] != "").sum()),
             "flagged_native_same_country": int(
                 head["check_native_same_country"].sum()),
+            "flagged_native_nearby": int(head["check_native_nearby"].sum()),
+            "flagged_possible_regional_native": int(
+                head["check_possible_regional_native"].sum()),
             "flagged_griis": int(head["griis_listed"].sum()),
         })
         return kept, dropped
@@ -1927,7 +2468,7 @@ EXPORT_NAMES = {"scan": "scan", "contributions": "contributions",
 
 def load_static_scanner(path, device=None, feature_chunk=4096,
                         n_mc_samples=None, n_ig_steps=None,
-                        saliency_top_k=None):
+                        saliency_top_k=None, score_calibration=None):
     """Rebuild a :class:`Scanner` from ``horizon_scan_static.pt``.
 
     The checkpoint holds the ensemble weights, the species embeddings and
@@ -1945,13 +2486,19 @@ def load_static_scanner(path, device=None, feature_chunk=4096,
         Pairs per feature-building chunk (lower it to save memory).
     n_mc_samples, n_ig_steps, saliency_top_k : int, optional
         Default: the values the checkpoint was exported with.
+    score_calibration : dict, optional
+        ``slope`` and ``intercept`` of the score calibration. Default:
+        the one stored in the checkpoint; a checkpoint without one gives
+        uncalibrated scores (the ranking is the same either way).
 
     Returns
     -------
     (Scanner, dict)
         The scanner, and the other checkpoint contents: ``format_version``,
         ``meta``, ``config``, ``metrics``, ``model_card``, ``native_pairs``
-        and ``location_iso3`` (the last three are None for format 4).
+        and ``location_iso3`` (the last three are None for format 4), and
+        ``alien_pairs`` (None for checkpoints written before the "native
+        nearby" columns; pass it to :class:`ChecklistChecks`).
         Formats 4 and 5 (GraphSAGE encoder, no location graph) load with
         the settings they were trained with.
     """
@@ -1997,8 +2544,16 @@ def load_static_scanner(path, device=None, feature_chunk=4096,
         n_mc_samples=n_mc_samples or config.get("N_MC_SAMPLES", 30),
         n_ig_steps=n_ig_steps or config.get("N_IG_STEPS", 50),
         saliency_top_k=saliency_top_k or config.get("SALIENCY_TOP_K", 15),
-        gbif_sleep_s=config.get("GBIF_SLEEP_S", 0.2))
+        gbif_sleep_s=config.get("GBIF_SLEEP_S", 0.2),
+        score_calibration=score_calibration)
+    if not scanner.calibration.get("fitted"):
+        warnings.warn("This checkpoint has no score calibration: the "
+                      "lists are ranked correctly (on score_logit), but "
+                      "the 0-1 scores may all be close to 1. Re-run "
+                      "notebook 05 (it reloads the saved trainings) to "
+                      "add the calibration.")
     native = ckpt.get("native_pairs")
+    alien = ckpt.get("alien_pairs")
     extras = {
         "format_version": version, "meta": meta, "config": config,
         "metrics": ckpt.get("metrics", {}),
@@ -2006,6 +2561,8 @@ def load_static_scanner(path, device=None, feature_chunk=4096,
         "native_pairs": (None if native is None
                          else (np.asarray(native[0]), np.asarray(native[1]))),
         "location_iso3": ckpt.get("location_iso3"),
+        "alien_pairs": (None if alien is None
+                        else (np.asarray(alien[0]), np.asarray(alien[1]))),
     }
     return scanner, extras
 
